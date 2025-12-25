@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const requireAuth_1 = require("../../middlewares/requireAuth");
+const studyPlan_controller_1 = require("./studyPlan.controller");
+const router = (0, express_1.Router)();
+router.use(requireAuth_1.requireAuth);
+router.post("/generate", studyPlan_controller_1.generatePlan);
+router.get("/me", studyPlan_controller_1.myPlans);
+router.patch("/items/:itemId/complete", studyPlan_controller_1.completePlanItem);
+exports.default = router;

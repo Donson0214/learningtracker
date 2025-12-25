@@ -1,0 +1,36 @@
+import { createApp, watch } from "vue";
+import { createPinia } from "pinia";
+import App from "./app/App.vue";
+import router from "./app/router";
+import { useAuthStore } from "@/features/auth/store";
+import { initTheme } from "@/shared/theme/useTheme";
+import {
+  connectRealtime,
+  disconnectRealtime,
+} from "@/shared/realtime/socket";
+
+import "./assets/main.css";
+
+initTheme();
+
+const app = createApp(App);
+const pinia = createPinia();
+
+app.use(pinia);
+app.use(router);
+
+const auth = useAuthStore(pinia);
+auth.initialize();
+watch(
+  () => auth.token,
+  (token) => {
+    if (token) {
+      connectRealtime(token);
+    } else {
+      disconnectRealtime();
+    }
+  },
+  { immediate: true }
+);
+
+app.mount("#app");

@@ -14,6 +14,50 @@ export type Organization = {
   createdAt: string;
   updatedAt: string;
   memberCount?: number;
+  courseCount?: number;
+};
+
+export type SystemOrganization = Organization & {
+  memberCount: number;
+  courseCount: number;
+  moduleCount?: number;
+  lessonCount?: number;
+};
+
+export type SystemMember = {
+  id: string;
+  name?: string | null;
+  email: string;
+  role: "LEARNER" | "ORG_ADMIN" | "SYSTEM_ADMIN";
+  createdAt: string;
+  organization?: {
+    id: string;
+    name: string;
+    isActive: boolean;
+  } | null;
+};
+
+export type SystemCourseModule = {
+  id: string;
+  title: string;
+  order: number;
+  lessonsCount: number;
+};
+
+export type SystemCourse = {
+  id: string;
+  title: string;
+  description?: string | null;
+  estimatedHours?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  organization?: {
+    id: string;
+    name: string;
+    isActive: boolean;
+  };
+  modulesCount: number;
+  modules?: SystemCourseModule[];
 };
 
 export type OrganizationMember = {
@@ -55,6 +99,10 @@ export type OrganizationInvite = {
   status: InviteStatus;
   createdAt: string;
   expiresAt: string;
+  organization?: {
+    id: string;
+    name: string;
+  };
   invitedBy?: {
     id: string;
     name?: string | null;
@@ -65,6 +113,8 @@ export type OrganizationInvite = {
     name?: string | null;
     email: string;
   } | null;
+  inviteLink?: string;
+  emailSent?: boolean;
 };
 
 export type Lesson = {
@@ -185,4 +235,22 @@ export type OrgAnalytics = {
     targetMinutes: number;
     actualMinutes: number;
   }>;
+};
+
+export type SystemAnalytics = {
+  totals: {
+    totalOrganizations: number;
+    activeOrganizations: number;
+    totalLearners: number;
+    totalCourses: number;
+    totalStudyMinutes: number;
+    avgStudyMinutesPerLearner: number;
+  };
+  monthlyStudyMinutes: Array<{ label: string; minutes: number }>;
+  studyMinutesByOrganization: Array<{
+    organizationId: string;
+    name: string;
+    minutes: number;
+  }>;
+  statusBreakdown: Array<{ label: string; count: number }>;
 };

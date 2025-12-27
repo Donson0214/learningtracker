@@ -51,6 +51,11 @@ export const createInvite = async (
       .json({ message: "User already belongs to this organization" });
   }
 
+  const existingUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true },
+  });
+
   const inviteRole = role?.toUpperCase() || "LEARNER";
   if (!allowedRoles.has(inviteRole)) {
     return res.status(400).json({ message: "Invalid role" });
@@ -82,6 +87,7 @@ export const createInvite = async (
     select: { name: true },
   });
 
+  let emailSent = true;
   try {
     await sendInviteEmail({
       to: invite.email,
@@ -91,7 +97,15 @@ export const createInvite = async (
       expiresInDays,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to send invite email" });
+    emailSent = false;
+    console.warn("Failed to send invite email:", error);
+  }
+
+  if (existingUser) {
+    broadcast({
+      type: "invites.changed",
+      scope: { userId: existingUser.id },
+    });
   }
 
   broadcast({
@@ -99,7 +113,24 @@ export const createInvite = async (
     scope: { organizationId: req.user.organizationId },
   });
 
-  res.status(201).json(invite);
+  res.status(201).json({
+    ...invite,
+    emailSent,
+    inviteLink,
+  });
+};
+
+export const listMyInvites = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const email = req.user?.email;
+  if (!email) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const invites = await inviteService.listInvitesForEmail(email);
+  res.json(invites);
 };
 
 export const listInvites = async (
@@ -193,4 +224,91 @@ export const acceptInvite = async (
   }
 
   res.json({ success: true, user: result.user });
+};
+
+export const acceptInviteById = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const result = await inviteService.acceptInviteById({
+    inviteId: req.params.id,
+    userId: req.user!.id,
+  });
+
+  if (result.status === "NOT_FOUND") {
+    return res.status(404).json({ message: "Invite not found" });
+  }
+  if (result.status === "EXPIRED") {
+    return res.status(410).json({ message: "Invite expired" });
+  }
+  if (result.status === "INACTIVE") {
+    return res.status(403).json({ message: "Organization is inactive" });
+  }
+  if (result.status === "ORG_CONFLICT") {
+    return res
+      .status(409)
+      .json({ message: "Already assigned to another organization" });
+  }
+  if (result.status === "USER_NOT_FOUND") {
+    return res.status(404).json({ message: "User not found" });
+  }
+  if (result.status === "EMAIL_MISMATCH") {
+    return res.status(403).json({ message: "Invite does not match user" });
+  }
+
+  if (result.invite?.organizationId) {
+    broadcast({
+      type: "invites.changed",
+      scope: { organizationId: result.invite.organizationId },
+    });
+  }
+  broadcast({
+    type: "invites.changed",
+    scope: { userId: req.user!.id },
+  });
+  broadcast({
+    type: "users.changed",
+    scope: { userId: req.user!.id },
+  });
+  if (result.user.organization?.id) {
+    broadcast({
+      type: "organizations.changed",
+      scope: { organizationId: result.user.organization.id },
+    });
+  }
+
+  res.json({ success: true, user: result.user });
+};
+
+export const declineInviteById = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const result = await inviteService.declineInviteById({
+    inviteId: req.params.id,
+    userId: req.user!.id,
+  });
+
+  if (result.status === "NOT_FOUND") {
+    return res.status(404).json({ message: "Invite not found" });
+  }
+  if (result.status === "USER_NOT_FOUND") {
+    return res.status(404).json({ message: "User not found" });
+  }
+  if (result.status === "EMAIL_MISMATCH") {
+    return res.status(403).json({ message: "Invite does not match user" });
+  }
+
+  if (result.invite?.organizationId) {
+    broadcast({
+      type: "invites.changed",
+      scope: { organizationId: result.invite.organizationId },
+    });
+  }
+  broadcast({
+    type: "invites.changed",
+    scope: { userId: req.user!.id },
+  });
+
+  res.json({ success: true });
 };

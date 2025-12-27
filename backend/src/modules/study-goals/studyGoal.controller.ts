@@ -2,6 +2,11 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../../middlewares/requireAuth";
 import * as studyGoalService from "./studyGoal.service";
 import { broadcast } from "../../realtime/realtime";
+import {
+  createStudyGoalSchema,
+  updateStudyGoalSchema,
+} from "../../validators/studyGoal.schema";
+import { buildValidationError } from "../../utils/validation";
 
 export const getMyGoal = async (
   req: AuthenticatedRequest,
@@ -22,24 +27,18 @@ export const createGoal = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const { hoursPerWeek, targetDate } = req.body;
-
-  if (!hoursPerWeek || typeof hoursPerWeek !== "number") {
-    return res.status(400).json({ message: "hoursPerWeek is required" });
+  const parsed = createStudyGoalSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
   }
 
-  let targetCompletionAt: Date | undefined = undefined;
-  if (targetDate) {
-    const parsedDate = new Date(targetDate);
-    if (Number.isNaN(parsedDate.getTime())) {
-      return res.status(400).json({ message: "targetDate is invalid" });
-    }
-    targetCompletionAt = parsedDate;
-  }
+  const targetCompletionAt = parsed.data.targetDate
+    ? new Date(parsed.data.targetDate)
+    : undefined;
 
   const goal = await studyGoalService.createStudyGoal(
     req.user!.id,
-    hoursPerWeek,
+    parsed.data.hoursPerWeek,
     targetCompletionAt
   );
 
@@ -55,25 +54,25 @@ export const updateGoal = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const { hoursPerWeek, targetDate } = req.body;
-
-  let targetCompletionAt: Date | null | undefined = undefined;
-  if (targetDate !== undefined) {
-    if (targetDate === null || targetDate === "") {
-      targetCompletionAt = null;
-    } else {
-      const parsedDate = new Date(targetDate);
-      if (Number.isNaN(parsedDate.getTime())) {
-        return res.status(400).json({ message: "targetDate is invalid" });
-      }
-      targetCompletionAt = parsedDate;
-    }
+  const parsed = updateStudyGoalSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
   }
+
+  const targetCompletionAt =
+    parsed.data.targetDate === null
+      ? null
+      : parsed.data.targetDate
+        ? new Date(parsed.data.targetDate)
+        : undefined;
 
   const result = await studyGoalService.updateStudyGoal(
     req.params.id,
     req.user!.id,
-    { hoursPerWeek, targetCompletionAt }
+    {
+      hoursPerWeek: parsed.data.hoursPerWeek,
+      targetCompletionAt,
+    }
   );
 
   if (result.count === 0) {

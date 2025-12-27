@@ -15,6 +15,20 @@ export const createLesson = async (
   });
 };
 
+export const getLessonByIdForOrg = async (
+  lessonId: string,
+  organizationId: string
+) => {
+  return prisma.lesson.findFirst({
+    where: {
+      id: lessonId,
+      module: {
+        course: { organizationId },
+      },
+    },
+  });
+};
+
 export const updateLesson = async (
   lessonId: string,
   data: {

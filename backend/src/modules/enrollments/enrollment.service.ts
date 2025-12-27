@@ -26,6 +26,19 @@ export const unenrollUser = async (
   });
 };
 
+export const getEnrollmentByIdForOrg = async (
+  enrollmentId: string,
+  organizationId: string
+) => {
+  return prisma.enrollment.findFirst({
+    where: {
+      id: enrollmentId,
+      course: { organizationId },
+    },
+    include: { course: true },
+  });
+};
+
 export const getEnrollmentsForUser = async (
   userId: string
 ) => {

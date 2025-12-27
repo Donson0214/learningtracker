@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth";
 import { requireRole } from "../../middlewares/requireRole";
+import { requireActiveOrganization } from "../../middlewares/requireActiveOrganization";
 import {
   enrollLearner,
+  enrollSelf,
+  unenrollSelf,
   unenrollLearner,
   myEnrollments,
   courseEnrollments,
@@ -12,10 +15,21 @@ import {
 const router = Router();
 
 router.use(requireAuth);
+router.use(requireActiveOrganization);
 
 // LEARNER
 router.get("/my", myEnrollments);
 router.get("/me", myEnrollments);
+router.post(
+  "/self",
+  requireRole(["LEARNER", "ORG_ADMIN", "SYSTEM_ADMIN"]),
+  enrollSelf
+);
+router.delete(
+  "/self/:courseId",
+  requireRole(["LEARNER", "ORG_ADMIN", "SYSTEM_ADMIN"]),
+  unenrollSelf
+);
 
 // ORG ADMIN
 router.post(

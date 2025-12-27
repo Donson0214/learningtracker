@@ -8,6 +8,7 @@ import {
   connectRealtime,
   disconnectRealtime,
 } from "@/shared/realtime/socket";
+import { setAuthRefreshHandler } from "@/shared/api/axios";
 
 import "./assets/main.css";
 
@@ -21,6 +22,7 @@ app.use(router);
 
 const auth = useAuthStore(pinia);
 auth.initialize();
+setAuthRefreshHandler(() => auth.refreshSession());
 watch(
   () => auth.token,
   (token) => {

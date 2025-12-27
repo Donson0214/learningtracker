@@ -21,6 +21,7 @@ const nameInput = ref("");
 const isActive = ref(true);
 const isSaving = ref(false);
 const isDeactivating = ref(false);
+const isActivating = ref(false);
 const errorMessage = computed(
   () => orgStore.errorMessage || coursesStore.errorMessage
 );
@@ -60,7 +61,12 @@ const hasUnsavedChanges = computed(
 useRealtimeRefresh(
   ["organizations.changed", "courses.changed", "enrollments.changed"],
   () => {
-    if (isSaving.value || isDeactivating.value || hasUnsavedChanges.value) {
+    if (
+      isSaving.value ||
+      isDeactivating.value ||
+      isActivating.value ||
+      hasUnsavedChanges.value
+    ) {
       return;
     }
     return loadData(true);
@@ -92,6 +98,18 @@ const deactivate = async () => {
     // Store already sets errorMessage.
   } finally {
     isDeactivating.value = false;
+  }
+};
+
+const activate = async () => {
+  isActivating.value = true;
+  try {
+    await orgStore.activate();
+    isActive.value = true;
+  } catch (error) {
+    // Store already sets errorMessage.
+  } finally {
+    isActivating.value = false;
   }
 };
 
@@ -133,6 +151,19 @@ const requestDeactivate = () => {
       "Deactivate this organization and disable access for all members? This action cannot be undone.",
     confirmLabel: "Deactivate",
     onConfirm: deactivate,
+  });
+};
+
+const requestActivate = () => {
+  if (isActive.value) {
+    return;
+  }
+  openConfirm({
+    title: "Reactivate organization",
+    message:
+      "Reactivate this organization and restore access for all members?",
+    confirmLabel: "Reactivate",
+    onConfirm: activate,
   });
 };
 
@@ -289,24 +320,36 @@ const createdAtLabel = computed(() => {
             </p>
           </div>
 
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              class="sr-only peer"
-              :checked="isActive"
-              :disabled="!isActive"
-              @click.prevent="requestDeactivate"
-            />
-            <div
-              class="w-10 h-5 bg-gray-200 rounded-full peer
-                     peer-checked:bg-gray-900
-                     after:content-['']
-                     after:absolute after:top-0.5 after:left-[2px]
-                     after:bg-white after:h-4 after:w-4
-                     after:rounded-full after:transition-all
-                     peer-checked:after:translate-x-full"
-            ></div>
-          </label>
+          <div class="flex items-center gap-3">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                class="sr-only peer"
+                :checked="isActive"
+                :disabled="!isActive"
+                @click.prevent="requestDeactivate"
+              />
+              <div
+                class="w-10 h-5 bg-gray-200 rounded-full peer
+                       peer-checked:bg-gray-900
+                       after:content-['']
+                       after:absolute after:top-0.5 after:left-[2px]
+                       after:bg-white after:h-4 after:w-4
+                       after:rounded-full after:transition-all
+                       peer-checked:after:translate-x-full"
+              ></div>
+            </label>
+            <button
+              v-if="!isActive"
+              class="bg-emerald-600 text-white
+                     px-3 py-1.5 rounded-lg
+                     text-xs font-medium hover:bg-emerald-700 disabled:opacity-70"
+              :disabled="isActivating"
+              @click="requestActivate"
+            >
+              {{ isActivating ? "Reactivating..." : "Reactivate" }}
+            </button>
+          </div>
         </div>
 
         <div class="mt-6 flex items-center gap-3">

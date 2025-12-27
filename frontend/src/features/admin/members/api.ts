@@ -65,3 +65,10 @@ export const revokeInvite = async (inviteId: string) => {
   );
   return data;
 };
+
+export const removeOrganizationMember = async (memberId: string) => {
+  const { data } = await apiClient.delete<{ success: boolean }>(
+    `/organizations/me/members/${memberId}`
+  );
+  return data;
+};

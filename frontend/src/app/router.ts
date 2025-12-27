@@ -20,11 +20,13 @@ import InviteAcceptPage from "@/features/invites/pages/InviteAcceptPage.vue";
 ====================== */
 import AdminLayout from "@/components/layout/AdminLayout.vue";
 
-import AdminDashboardPage from "@/features/admin/dashboard/AdminDashboardPage.vue";
+import AdminHomePage from "@/features/admin/dashboard/AdminHomePage.vue";
 import OrganizationPage from "@/features/admin/organization/OrganizationPage.vue";
-import AdminCoursesPage from "@/features/admin/courses/AdminCoursesPage.vue";
-import MembersPage from "@/features/admin/members/MembersPage.vue";
+import AdminCoursesHome from "@/features/admin/courses/AdminCoursesHome.vue";
+import AdminMembersHome from "@/features/admin/members/AdminMembersHome.vue";
 import AnalyticsPage from "@/features/admin/analytics/AnalyticsPage.vue";
+import SystemOrganizationsPage from "@/features/system-admin/organizations/SystemOrganizationsPage.vue";
+import SystemOrganizationDetailPage from "@/features/system-admin/organizations/SystemOrganizationDetailPage.vue";
 import { useAuthStore } from "@/features/auth/store";
 
 const routes = [
@@ -55,11 +57,37 @@ const routes = [
     component: AdminLayout,
     meta: { requiresAuth: true, requiresRole: ["ORG_ADMIN", "SYSTEM_ADMIN"] },
     children: [
-      { path: "", component: AdminDashboardPage },
-      { path: "organization", component: OrganizationPage },
-      { path: "courses", component: AdminCoursesPage },
-      { path: "members", component: MembersPage },
-      { path: "analytics", component: AnalyticsPage },
+      { path: "", component: AdminHomePage },
+      {
+        path: "organization",
+        component: OrganizationPage,
+        meta: { requiresRole: ["ORG_ADMIN"] },
+      },
+      {
+        path: "courses",
+        component: AdminCoursesHome,
+        meta: { requiresRole: ["ORG_ADMIN", "SYSTEM_ADMIN"] },
+      },
+      {
+        path: "members",
+        component: AdminMembersHome,
+        meta: { requiresRole: ["ORG_ADMIN", "SYSTEM_ADMIN"] },
+      },
+      {
+        path: "analytics",
+        component: AnalyticsPage,
+        meta: { requiresRole: ["ORG_ADMIN"] },
+      },
+      {
+        path: "organizations",
+        component: SystemOrganizationsPage,
+        meta: { requiresRole: ["SYSTEM_ADMIN"] },
+      },
+      {
+        path: "organizations/:organizationId",
+        component: SystemOrganizationDetailPage,
+        meta: { requiresRole: ["SYSTEM_ADMIN"] },
+      },
     ],
   },
 ];

@@ -13,6 +13,7 @@ import {
   fetchInvites,
   fetchOrganizationMembers,
   fetchUserEnrollments,
+  removeOrganizationMember,
   revokeInvite,
   unenrollLearner,
 } from "./api";
@@ -242,7 +243,12 @@ export const useAdminMembersStore = defineStore(
     }) => {
       clearError();
       try {
-        await createInvite(payload);
+        const response = await createInvite(payload);
+        if (response.emailSent === false && response.inviteLink) {
+          errorMessage.value =
+            "Invite created, but email was not sent. Share this link: " +
+            response.inviteLink;
+        }
         invites.value = await fetchInvites();
       } catch (error) {
         errorMessage.value = "Unable to send invite.";
@@ -285,6 +291,18 @@ export const useAdminMembersStore = defineStore(
         await loadEnrollmentsForUser(userId);
       } catch (error) {
         errorMessage.value = "Unable to update enrollments.";
+        throw error;
+      }
+    };
+
+    const removeMember = async (memberId: string) => {
+      clearError();
+      try {
+        await removeOrganizationMember(memberId);
+        membersCache.clear();
+        await loadMembers({ page: membersPage.value, force: true });
+      } catch (error) {
+        errorMessage.value = "Unable to remove member.";
         throw error;
       }
     };
@@ -336,6 +354,7 @@ export const useAdminMembersStore = defineStore(
       sendInvite,
       removeInvite,
       updateEnrollmentsForUser,
+      removeMember,
       clearError,
       clear,
     };

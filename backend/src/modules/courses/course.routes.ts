@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth";
 import { requireRole } from "../../middlewares/requireRole";
+import { requireActiveOrganization } from "../../middlewares/requireActiveOrganization";
 
 import {
   createCourse,
   listCourses,
+  listCourseCatalog,
   getCourse,
   updateCourse,
   deleteCourse,
@@ -26,6 +28,7 @@ import {
 const router = Router();
 
 router.use(requireAuth);
+router.use(requireActiveOrganization);
 
 // COURSES
 router.post(
@@ -34,6 +37,11 @@ router.post(
   createCourse
 );
 router.get("/", listCourses);
+router.get(
+  "/catalog",
+  requireRole(["LEARNER", "ORG_ADMIN", "SYSTEM_ADMIN"]),
+  listCourseCatalog
+);
 router.get("/:id", getCourse);
 router.put(
   "/:id",

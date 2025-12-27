@@ -3,27 +3,22 @@ import { AuthenticatedRequest } from "../../middlewares/requireAuth";
 import { ensureUserEnrolled } from "../enrollments/enrollment.guard";
 import * as studyPlanService from "./studyPlan.service";
 import { broadcast } from "../../realtime/realtime";
+import {
+  generateStudyPlanSchema,
+  rescheduleStudyPlanItemSchema,
+} from "../../validators/studyPlan.schema";
+import { buildValidationError } from "../../utils/validation";
 
 export const generatePlan = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const { courseIds, hoursPerWeek, targetDate } = req.body;
-
-  if (!Array.isArray(courseIds) || courseIds.length === 0) {
-    return res.status(400).json({ message: "courseIds is required" });
+  const parsed = generateStudyPlanSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
   }
-
-  if (!hoursPerWeek || typeof hoursPerWeek !== "number") {
-    return res
-      .status(400)
-      .json({ message: "hoursPerWeek is required" });
-  }
-
+  const { courseIds, hoursPerWeek, targetDate } = parsed.data;
   const parsedTargetDate = new Date(targetDate);
-  if (!targetDate || Number.isNaN(parsedTargetDate.getTime())) {
-    return res.status(400).json({ message: "targetDate is invalid" });
-  }
 
   try {
     for (const courseId of courseIds) {
@@ -84,21 +79,15 @@ export const reschedulePlanItem = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const { scheduledDate } = req.body as { scheduledDate?: string };
-
-  if (!scheduledDate) {
-    return res.status(400).json({ message: "scheduledDate is required" });
-  }
-
-  const parsedDate = new Date(scheduledDate);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return res.status(400).json({ message: "scheduledDate is invalid" });
+  const parsed = rescheduleStudyPlanItemSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
   }
 
   const result = await studyPlanService.reschedulePlanItem(
     req.params.itemId,
     req.user!.id,
-    parsedDate
+    new Date(parsed.data.scheduledDate)
   );
 
   if (result.count === 0) {

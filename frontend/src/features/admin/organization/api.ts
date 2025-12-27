@@ -8,6 +8,14 @@ export const fetchOrganization = async () => {
   return data;
 };
 
+export const createOrganization = async (name: string) => {
+  const { data } = await apiClient.post<Organization>(
+    "/organizations",
+    { name }
+  );
+  return data;
+};
+
 export const updateOrganization = async (name: string) => {
   const { data } = await apiClient.put<Organization>(
     "/organizations",
@@ -21,6 +29,13 @@ export const updateOrganization = async (name: string) => {
 export const deactivateOrganization = async () => {
   const { data } = await apiClient.delete<Organization>(
     "/organizations"
+  );
+  return data;
+};
+
+export const activateOrganization = async () => {
+  const { data } = await apiClient.patch<Organization>(
+    "/organizations/activate"
   );
   return data;
 };

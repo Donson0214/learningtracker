@@ -15,6 +15,7 @@
         class="bg-gray-900 text-white px-4 py-2 rounded-lg
                text-sm font-medium hover:bg-gray-800
                inline-flex items-center gap-2"
+        :disabled="!hasOrganization"
         @click="openCreate"
       >
         <PlusIcon class="h-4 w-4" />
@@ -30,8 +31,10 @@
       :message="errorMessage"
     />
 
+    <NoOrganizationState v-if="!hasOrganization" class="mb-6" />
+
     <!-- Table -->
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div v-else class="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div class="px-4 py-3 border-b border-gray-200 flex justify-between">
         <h3 class="font-semibold text-gray-900">Recent Sessions</h3>
         <div class="relative">
@@ -218,6 +221,7 @@ import Input from "@/components/ui/Input.vue";
 import Button from "@/components/ui/Button.vue";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import TableStateRow from "@/components/ui/TableStateRow.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
 import { fetchMyEnrollments } from "@/features/courses/api";
 import {
@@ -229,12 +233,17 @@ import {
 import type { Enrollment, StudySession } from "@/shared/types";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
+import { useAuthStore } from "@/features/auth/store";
 
+const auth = useAuthStore();
 const sessions = ref<StudySession[]>([]);
 const enrollments = ref<Enrollment[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
 const selectedCourseId = ref("");
+const hasOrganization = computed(
+  () => Boolean(auth.user?.organization)
+);
 
 const showModal = ref(false);
 const isSaving = ref(false);
@@ -260,6 +269,13 @@ const confirmDialog = ref({
 const isConfirming = ref(false);
 
 const loadData = async () => {
+  if (!hasOrganization.value) {
+    errorMessage.value = "";
+    sessions.value = [];
+    enrollments.value = [];
+    isLoading.value = false;
+    return;
+  }
   errorMessage.value = "";
   isLoading.value = true;
   try {

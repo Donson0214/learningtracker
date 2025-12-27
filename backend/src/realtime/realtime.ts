@@ -188,6 +188,20 @@ export const initRealtimeServer = (server: HttpServer) => {
 
     try {
       const user = await ensureUserFromToken(token);
+      if (user.organizationId) {
+        const org = await prisma.organization.findUnique({
+          where: { id: user.organizationId },
+          select: { isActive: true },
+        });
+        if (!org) {
+          socket.close(4404, "Organization not found");
+          return;
+        }
+        if (!org.isActive) {
+          socket.close(4403, "Organization is inactive");
+          return;
+        }
+      }
       const client: RealtimeClient = {
         socket,
         userId: user.id,

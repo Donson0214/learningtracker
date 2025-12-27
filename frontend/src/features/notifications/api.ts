@@ -20,3 +20,11 @@ export const updateDailyReminder = async (enabled: boolean) => {
   );
   return data;
 };
+
+export const saveDeviceToken = async (token: string) => {
+  const { data } = await apiClient.post<{ success: boolean }>(
+    "/notifications/device-token",
+    { token }
+  );
+  return data;
+};

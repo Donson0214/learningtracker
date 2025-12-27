@@ -10,10 +10,13 @@ import studySessionRoutes from "./modules/study-sessions/studySession.routes";
 import studyGoalRoutes from "./modules/study-goals/studyGoal.routes";
 import studyPlanRoutes from "./modules/study-plans/studyPlan.routes";
 import notificationRoutes from "./modules/notifications/notification.routes";
+import reminderRoutes from "./modules/notifications/reminder.routes";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
 import userRoutes from "./modules/users/user.routes";
+import systemRoutes from "./modules/system/system.routes";
 import { requireAuth } from "./middlewares/requireAuth";
 import { requireRole } from "./middlewares/requireRole";
+import { requireActiveOrganization } from "./middlewares/requireActiveOrganization";
 import { createLesson } from "./modules/courses/lesson.controller";
 
 const router = Router();
@@ -32,17 +35,20 @@ router.use("/study-sessions", studySessionRoutes);
 router.use("/study-goals", studyGoalRoutes);
 router.use("/study-plans", studyPlanRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/notifications/reminders", reminderRoutes);
 
 // ✅ required analytics feature
 router.use("/analytics", analyticsRoutes);
 
 // ✅ profile endpoint (useful)
 router.use("/users", userRoutes);
+router.use("/system", systemRoutes);
 
 // Legacy/alternate lesson endpoint
 router.post(
   "/modules/:moduleId/lessons",
   requireAuth,
+  requireActiveOrganization,
   requireRole(["ORG_ADMIN"]),
   createLesson
 );

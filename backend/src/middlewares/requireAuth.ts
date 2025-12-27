@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import type { UserRole } from "@prisma/client";
 import { firebaseAdmin } from "../config/firebase";
 import { prisma } from "../prisma";
 
@@ -8,7 +9,7 @@ export interface AuthenticatedRequest extends Request {
     firebaseUid: string;
     email: string;
     name: string | null;
-    role: string;
+    role: UserRole;
     organizationId: string | null;
   };
 }

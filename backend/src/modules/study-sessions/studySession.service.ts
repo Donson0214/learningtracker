@@ -32,14 +32,37 @@ export const getSessionById = async (
   });
 };
 
-export const getSessionsForUser = async (userId: string) => {
+type SessionFilters = {
+  courseId?: string;
+  moduleId?: string;
+  limit?: number;
+};
+
+export const getSessionsForUser = async (
+  userId: string,
+  filters: SessionFilters = {}
+) => {
+  const where: {
+    userId: string;
+    courseId?: string;
+    moduleId?: string;
+  } = { userId };
+
+  if (filters.courseId) {
+    where.courseId = filters.courseId;
+  }
+  if (filters.moduleId) {
+    where.moduleId = filters.moduleId;
+  }
+
   return prisma.studySession.findMany({
-    where: { userId },
+    where,
     include: {
       course: true,
       module: true,
     },
     orderBy: { studiedAt: "desc" },
+    ...(filters.limit ? { take: filters.limit } : {}),
   });
 };
 
@@ -48,8 +71,8 @@ export const updateStudySession = async (
   userId: string,
   data: {
     durationMinutes?: number;
-    notes?: string;
-    mood?: string;
+    notes?: string | null;
+    mood?: string | null;
     studiedAt?: Date;
   }
 ) => {

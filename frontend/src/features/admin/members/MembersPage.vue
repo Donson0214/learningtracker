@@ -16,8 +16,10 @@ import type { OrganizationMember } from "@/shared/types";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import { useAdminMembersStore } from "./store";
+import { useAuthStore } from "@/features/auth/store";
 
 const membersStore = useAdminMembersStore();
+const auth = useAuthStore();
 const members = computed(() => membersStore.members);
 const invites = computed(() => membersStore.invites);
 const summary = computed(() => membersStore.summary);
@@ -96,6 +98,14 @@ const openAssignCourses = async (member: OrganizationMember) => {
   ]);
   const current = enrollmentsByUser.value[member.id] ?? {};
   selectedCourseIds.value = Object.keys(current);
+};
+
+const removeMember = async (memberId: string) => {
+  try {
+    await membersStore.removeMember(memberId);
+  } catch (error) {
+    // Store already sets errorMessage.
+  }
 };
 
 const saveAssignments = async () => {
@@ -191,6 +201,15 @@ const requestRevokeInvite = (email: string, inviteId: string) => {
     message: `Revoke the invite sent to ${email}?`,
     confirmLabel: "Revoke invite",
     onConfirm: () => removeInvite(inviteId),
+  });
+};
+
+const requestRemoveMember = (member: OrganizationMember) => {
+  openConfirm({
+    title: "Remove member",
+    message: `Remove ${member.name || member.email} from this organization?`,
+    confirmLabel: "Remove member",
+    onConfirm: () => removeMember(member.id),
   });
 };
 
@@ -432,6 +451,13 @@ const catalogRangeLabel = computed(() => {
                 >
                   <BookOpenIcon class="h-4 w-4" />
                   Assign Courses
+                </button>
+                <button
+                  v-if="member.id !== auth.user?.id && member.role !== 'SYSTEM_ADMIN'"
+                  class="text-rose-600 hover:text-rose-700 text-sm"
+                  @click="requestRemoveMember(member)"
+                >
+                  Remove
                 </button>
               </div>
             </td>

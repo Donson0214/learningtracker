@@ -27,7 +27,7 @@ export const sendStudyPlanReminders = async () => {
     await prisma.notification.create({
       data: {
         userId: item.studyPlan.userId,
-        title: "Study Reminder 📚",
+        title: "Study Reminder",
         body: "You have a scheduled study task to complete today.",
       },
     });

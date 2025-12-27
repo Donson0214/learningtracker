@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth";
+import { requireActiveOrganization } from "../../middlewares/requireActiveOrganization";
 import {
   generatePlan,
   myPlans,
@@ -10,6 +11,7 @@ import {
 const router = Router();
 
 router.use(requireAuth);
+router.use(requireActiveOrganization);
 
 router.post("/generate", generatePlan);
 router.get("/me", myPlans);

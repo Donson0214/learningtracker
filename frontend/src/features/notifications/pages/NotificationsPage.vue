@@ -15,6 +15,8 @@
       :message="errorMessage"
     />
 
+    <NoOrganizationState v-if="!hasOrganization" class="mb-6" />
+
     <div class="flex items-center gap-2 mb-6">
       <button
         class="px-3 py-1 text-xs font-medium rounded-full shadow-sm"
@@ -23,7 +25,7 @@
           : 'bg-gray-100 text-gray-600'"
         @click="filter = 'all'"
       >
-        All ({{ notifications.length }})
+        All ({{ visibleNotifications.length }})
       </button>
       <button
         class="px-3 py-1 text-xs font-medium rounded-full"
@@ -35,10 +37,11 @@
         Unread ({{ unreadCount }})
       </button>
       <button
-        class="px-3 py-1 text-xs font-medium rounded-full"
+        class="px-3 py-1 text-xs font-medium rounded-full disabled:opacity-60"
         :class="filter === 'settings'
           ? 'bg-white border border-gray-200'
           : 'bg-gray-100 text-gray-600'"
+        :disabled="!hasOrganization"
         @click="filter = 'settings'"
       >
         Settings
@@ -46,7 +49,16 @@
     </div>
 
     <div v-if="filter === 'settings'">
-      <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <StateMessage
+        v-if="!hasOrganization"
+        variant="empty"
+        title="Join an organization"
+        message="Reminder settings are available after you join an organization."
+      />
+      <div
+        v-else
+        class="bg-white border border-gray-200 rounded-xl p-4"
+      >
         <div class="flex items-center justify-between">
           <div>
             <p class="font-semibold text-gray-900">Daily reminders</p>
@@ -59,6 +71,7 @@
               type="checkbox"
               class="sr-only peer"
               :checked="dailyReminderEnabled"
+              :disabled="!hasOrganization"
               @change="toggleReminder"
             />
             <div
@@ -76,6 +89,74 @@
     </div>
 
     <div v-else class="space-y-4">
+      <div class="bg-white border border-gray-200 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-gray-900">Organization Invites</h3>
+            <p class="text-sm text-gray-500">
+              Accept or decline invitations to join an organization.
+            </p>
+          </div>
+        </div>
+
+        <StateMessage
+          v-if="invitesErrorMessage"
+          variant="error"
+          title="Invite error"
+          :message="invitesErrorMessage"
+        />
+
+        <StateMessage
+          v-else-if="isInvitesLoading"
+          variant="loading"
+          title="Loading invites"
+          message="Checking for new invitations."
+        />
+
+        <StateMessage
+          v-else-if="invites.length === 0"
+          variant="empty"
+          title="No invites yet"
+          message="You'll see organization invitations here."
+        />
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="invite in invites"
+            :key="invite.id"
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-gray-100 rounded-lg p-3"
+          >
+            <div>
+              <p class="text-sm font-semibold text-gray-900">
+                {{ invite.organization?.name ?? "Organization" }}
+              </p>
+              <p class="text-xs text-gray-500">
+                Invited by {{ invite.invitedBy?.name || invite.invitedBy?.email || "Admin" }}
+              </p>
+              <p class="text-xs text-gray-400 mt-1">
+                Expires {{ formatDate(invite.expiresAt) }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-70"
+                :disabled="inviteActionId === invite.id"
+                @click="handleAcceptInvite(invite.id)"
+              >
+                {{ inviteActionId === invite.id ? "Accepting..." : "Accept" }}
+              </button>
+              <button
+                class="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-70"
+                :disabled="inviteActionId === invite.id"
+                @click="handleDeclineInvite(invite.id)"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <StateMessage
         v-if="isLoading"
         variant="loading"
@@ -128,24 +209,49 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { BellIcon } from "@heroicons/vue/24/outline";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
-import { fetchNotifications, markNotificationRead, updateDailyReminder } from "../api";
+import {
+  fetchNotifications,
+  markNotificationRead,
+  saveDeviceToken,
+  updateDailyReminder,
+} from "../api";
 import type { Notification } from "@/shared/types";
 import { useAuthStore } from "@/features/auth/store";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
+import { requestNotificationToken } from "@/shared/firebase/messaging";
+import {
+  acceptInviteById,
+  declineInviteById,
+  fetchMyInvites,
+} from "@/features/invites/api";
+import type { OrganizationInvite } from "@/shared/types";
 
 const auth = useAuthStore();
 const notifications = ref<Notification[]>([]);
+const invites = ref<OrganizationInvite[]>([]);
 const isLoading = ref(true);
+const isInvitesLoading = ref(true);
 const errorMessage = ref("");
+const invitesErrorMessage = ref("");
 const filter = ref<"all" | "unread" | "settings">("all");
 const dailyReminderEnabled = ref(
   auth.user?.dailyReminderEnabled ?? true
 );
+const inviteActionId = ref<string | null>(null);
+const hasOrganization = computed(
+  () => Boolean(auth.user?.organization)
+);
 
 const loadNotifications = async () => {
   errorMessage.value = "";
+  if (!hasOrganization.value) {
+    notifications.value = [];
+    isLoading.value = false;
+    return;
+  }
   isLoading.value = true;
   try {
     notifications.value = await fetchNotifications();
@@ -156,18 +262,43 @@ const loadNotifications = async () => {
   }
 };
 
+const loadInvites = async () => {
+  invitesErrorMessage.value = "";
+  isInvitesLoading.value = true;
+  try {
+    invites.value = await fetchMyInvites();
+  } catch (error) {
+    invitesErrorMessage.value = "Unable to load invites.";
+  } finally {
+    isInvitesLoading.value = false;
+  }
+};
+
 useAutoRefresh(loadNotifications, { intervalMs: 30000 });
-useRealtimeRefresh(["notifications.changed"], loadNotifications);
+useAutoRefresh(loadInvites, { intervalMs: 30000 });
+useRealtimeRefresh(
+  ["notifications.changed", "invites.changed"],
+  () => {
+    loadNotifications();
+    loadInvites();
+  }
+);
+
+const visibleNotifications = computed(() =>
+  notifications.value.filter(
+    (item) => item.title !== "Organization Invitation"
+  )
+);
 
 const unreadCount = computed(
-  () => notifications.value.filter((item) => !item.isRead).length
+  () => visibleNotifications.value.filter((item) => !item.isRead).length
 );
 
 const filteredNotifications = computed(() => {
   if (filter.value === "unread") {
-    return notifications.value.filter((item) => !item.isRead);
+    return visibleNotifications.value.filter((item) => !item.isRead);
   }
-  return notifications.value;
+  return visibleNotifications.value;
 });
 
 const markRead = async (notification: Notification) => {
@@ -183,16 +314,55 @@ const markRead = async (notification: Notification) => {
 };
 
 const toggleReminder = async () => {
+  if (!hasOrganization.value) {
+    errorMessage.value = "Join an organization to enable reminders.";
+    return;
+  }
   const nextValue = !dailyReminderEnabled.value;
   dailyReminderEnabled.value = nextValue;
   try {
+    if (nextValue) {
+      const token = await requestNotificationToken();
+      await saveDeviceToken(token);
+    }
     await updateDailyReminder(nextValue);
     if (auth.user) {
       auth.user.dailyReminderEnabled = nextValue;
     }
   } catch (error) {
     dailyReminderEnabled.value = !nextValue;
-    errorMessage.value = "Unable to update reminder settings.";
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Unable to update reminder settings.";
+  }
+};
+
+const handleAcceptInvite = async (inviteId: string) => {
+  invitesErrorMessage.value = "";
+  inviteActionId.value = inviteId;
+  try {
+    await acceptInviteById(inviteId);
+    await auth.refreshProfile();
+    await loadNotifications();
+    await loadInvites();
+  } catch (error) {
+    invitesErrorMessage.value = "Unable to accept invite.";
+  } finally {
+    inviteActionId.value = null;
+  }
+};
+
+const handleDeclineInvite = async (inviteId: string) => {
+  invitesErrorMessage.value = "";
+  inviteActionId.value = inviteId;
+  try {
+    await declineInviteById(inviteId);
+    await loadInvites();
+  } catch (error) {
+    invitesErrorMessage.value = "Unable to decline invite.";
+  } finally {
+    inviteActionId.value = null;
   }
 };
 

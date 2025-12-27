@@ -3,6 +3,12 @@ import { AuthenticatedRequest } from "../../middlewares/requireAuth";
 import * as studyService from "./studySession.service";
 import { ensureUserEnrolled } from "../enrollments/enrollment.guard";
 import { broadcast } from "../../realtime/realtime";
+import { prisma } from "../../prisma";
+import {
+  createStudySessionSchema,
+  updateStudySessionSchema,
+} from "../../validators/studySession.schema";
+import { buildValidationError } from "../../utils/validation";
 
 
 
@@ -10,6 +16,10 @@ export const createSession = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
+  const parsed = createStudySessionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
+  }
   const {
     courseId,
     moduleId,
@@ -17,22 +27,34 @@ export const createSession = async (
     notes,
     mood,
     studiedAt,
-  } = req.body;
+  } = parsed.data;
 
-  if (!courseId || !durationMinutes || !studiedAt) {
-    return res.status(400).json({
-      message: "courseId, durationMinutes, and studiedAt are required",
+  try {
+    await ensureUserEnrolled(req.user!.id, courseId);
+  } catch (error: any) {
+    return res.status(403).json({ message: error.message });
+  }
+
+  if (moduleId) {
+    const module = await prisma.module.findFirst({
+      where: { id: moduleId, courseId },
+      select: { id: true },
     });
+    if (!module) {
+      return res
+        .status(400)
+        .json({ message: "Module does not belong to course" });
+    }
   }
 
   const session = await studyService.createStudySession(
     req.user!.id,
     {
       courseId,
-      moduleId,
+      moduleId: moduleId ?? undefined,
       durationMinutes,
-      notes,
-      mood,
+      notes: notes ?? undefined,
+      mood: mood ?? undefined,
       studiedAt: new Date(studiedAt),
     }
   );
@@ -55,9 +77,37 @@ export const listMySessions = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const sessions = await studyService.getSessionsForUser(
-    req.user!.id
-  );
+  const { courseId, moduleId, limit } = req.query;
+
+  if (courseId !== undefined && typeof courseId !== "string") {
+    return res.status(400).json({ message: "courseId must be a string" });
+  }
+  if (moduleId !== undefined && typeof moduleId !== "string") {
+    return res.status(400).json({ message: "moduleId must be a string" });
+  }
+
+  let parsedLimit: number | undefined;
+  if (limit !== undefined) {
+    const raw = Array.isArray(limit) ? limit[0] : limit;
+    const parsed = Number(raw);
+    if (
+      !Number.isFinite(parsed) ||
+      !Number.isInteger(parsed) ||
+      parsed <= 0 ||
+      parsed > 500
+    ) {
+      return res
+        .status(400)
+        .json({ message: "limit must be between 1 and 500" });
+    }
+    parsedLimit = Math.floor(parsed);
+  }
+
+  const sessions = await studyService.getSessionsForUser(req.user!.id, {
+    courseId: courseId ? courseId : undefined,
+    moduleId: moduleId ? moduleId : undefined,
+    limit: parsedLimit,
+  });
 
   res.json(sessions);
 };
@@ -70,11 +120,26 @@ export const updateSession = async (
     req.params.id,
     req.user!.id
   );
+  if (!existing) {
+    return res.status(404).json({ message: "Session not found" });
+  }
+
+  const parsed = updateStudySessionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
+  }
+
+  const updates = {
+    ...parsed.data,
+    ...(parsed.data.studiedAt
+      ? { studiedAt: new Date(parsed.data.studiedAt) }
+      : {}),
+  };
 
   await studyService.updateStudySession(
     req.params.id,
     req.user!.id,
-    req.body
+    updates
   );
 
   broadcast({
@@ -99,6 +164,9 @@ export const deleteSession = async (
     req.params.id,
     req.user!.id
   );
+  if (!existing) {
+    return res.status(404).json({ message: "Session not found" });
+  }
 
   await studyService.deleteStudySession(
     req.params.id,

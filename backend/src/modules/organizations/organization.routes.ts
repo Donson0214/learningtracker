@@ -7,6 +7,8 @@ import {
   getMyOrgMembers,
   updateOrg,
   deactivateOrg,
+  activateOrg,
+  removeOrgMember,
 } from "./organization.controller";
 
 const router = Router();
@@ -14,7 +16,6 @@ const router = Router();
 router.post(
   "/",
   requireAuth,
-  requireRole(["ORG_ADMIN"]),
   createOrg
 );
 
@@ -31,6 +32,13 @@ router.get(
   getMyOrgMembers
 );
 
+router.delete(
+  "/me/members/:memberId",
+  requireAuth,
+  requireRole(["ORG_ADMIN"]),
+  removeOrgMember
+);
+
 router.put(
   "/",
   requireAuth,
@@ -43,6 +51,13 @@ router.delete(
   requireAuth,
   requireRole(["ORG_ADMIN"]),
   deactivateOrg
+);
+
+router.patch(
+  "/activate",
+  requireAuth,
+  requireRole(["ORG_ADMIN"]),
+  activateOrg
 );
 
 export default router;

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Organization } from "@/shared/types";
 import {
+  activateOrganization,
   deactivateOrganization,
   fetchOrganization,
   updateOrganization,
@@ -60,6 +61,17 @@ export const useAdminOrganizationStore = defineStore(
       }
     };
 
+    const activate = async () => {
+      clearError();
+      try {
+        organization.value = await activateOrganization();
+        return organization.value;
+      } catch (error) {
+        errorMessage.value = "Unable to reactivate organization.";
+        throw error;
+      }
+    };
+
     const clear = () => {
       organization.value = null;
       isLoading.value = false;
@@ -73,6 +85,7 @@ export const useAdminOrganizationStore = defineStore(
       loadOrganization,
       updateOrganizationName,
       deactivate,
+      activate,
       clearError,
       clear,
     };

@@ -1,8 +1,15 @@
 import { apiClient } from "@/shared/api/axios";
 import type { StudySession } from "@/shared/types";
 
-export const fetchStudySessions = async () => {
-  const { data } = await apiClient.get<StudySession[]>("/study-sessions/me");
+export const fetchStudySessions = async (params?: {
+  courseId?: string;
+  moduleId?: string;
+  limit?: number;
+}) => {
+  const { data } = await apiClient.get<StudySession[]>(
+    "/study-sessions/me",
+    params ? { params } : undefined
+  );
   return data;
 };
 

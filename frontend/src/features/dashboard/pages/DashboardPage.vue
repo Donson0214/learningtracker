@@ -16,8 +16,11 @@
       :message="errorMessage"
     />
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+    <NoOrganizationState v-if="!hasOrganization" class="mb-6" />
+
+    <template v-else>
+      <!-- Stats -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
       <StatCard
         label="Total Study Hours"
         :value="totalStudyHours"
@@ -49,6 +52,104 @@
 
     <!-- Weekly chart -->
     <WeeklyStudyChart class="mb-10" :labels="weekLabels" :values="weekValues" />
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">
+            Recent Sessions
+          </h3>
+          <RouterLink
+            to="/study-sessions"
+            class="text-sm text-gray-500 hover:text-gray-700"
+          >
+            View all
+          </RouterLink>
+        </div>
+
+        <StateMessage
+          v-if="isLoading"
+          variant="loading"
+          title="Loading sessions"
+          message="Fetching your recent study sessions."
+        />
+
+        <StateMessage
+          v-else-if="recentSessions.length === 0"
+          variant="empty"
+          title="No sessions yet"
+          message="Log a session to see your recent activity."
+        />
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="session in recentSessions"
+            :key="session.id"
+            class="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3"
+          >
+            <div>
+              <p class="text-sm font-medium text-gray-900">
+                {{ session.course }}
+              </p>
+              <p class="text-xs text-gray-500">
+                {{ session.module }} · {{ session.date }}
+              </p>
+            </div>
+            <div class="text-sm font-medium text-gray-700">
+              {{ session.duration }} min
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-gray-900">
+            Upcoming Study Plan
+          </h3>
+          <RouterLink
+            to="/study-plan"
+            class="text-sm text-gray-500 hover:text-gray-700"
+          >
+            View plan
+          </RouterLink>
+        </div>
+
+        <StateMessage
+          v-if="isLoading"
+          variant="loading"
+          title="Loading plan"
+          message="Fetching your upcoming tasks."
+        />
+
+        <StateMessage
+          v-else-if="upcomingItems.length === 0"
+          variant="empty"
+          title="No upcoming tasks"
+          message="Generate a study plan to see upcoming sessions."
+        />
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="item in upcomingItems"
+            :key="item.id"
+            class="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3"
+          >
+            <div>
+              <p class="text-sm font-medium text-gray-900">
+                {{ item.title }}
+              </p>
+              <p class="text-xs text-gray-500">
+                {{ item.course }} · {{ item.date }}
+              </p>
+            </div>
+            <div class="text-sm font-medium text-gray-700">
+              {{ item.duration }} min
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Course Progress -->
     <div class="flex items-center justify-between mb-4">
@@ -92,8 +193,9 @@
       />
     </div>
 
-    <!-- Continue Learning CTA -->
-    <ContinueLearningCTA />
+      <!-- Continue Learning CTA -->
+      <ContinueLearningCTA />
+    </template>
   </div>
 </template>
 
@@ -104,6 +206,7 @@ import { fetchLearnerDashboard } from "@/features/dashboard/api";
 import { fetchMyEnrollments } from "@/features/courses/api";
 import { fetchStudySessions } from "@/features/study-sessions/api";
 import type { Enrollment, StudySession } from "@/shared/types";
+import type { LearnerDashboard } from "@/features/dashboard/api";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 
@@ -111,6 +214,7 @@ import StatCard from "@/components/ui/StatCard.vue";
 import WeeklyStudyChart from "@/components/charts/WeeklyStudyChart.vue";
 import CourseProgressCard from "@/components/ui/CourseProgressCard.vue";
 import ContinueLearningCTA from "@/components/ui/ContinueLearningCTA.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
 
 import {
@@ -121,26 +225,38 @@ import {
 } from "@heroicons/vue/24/outline";
 
 const auth = useAuthStore();
+const dashboard = ref<LearnerDashboard | null>(null);
 const enrollments = ref<Enrollment[]>([]);
 const sessions = ref<StudySession[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
+const hasOrganization = computed(
+  () => Boolean(auth.user?.organization)
+);
 
 const weekLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const loadData = async () => {
+  if (!hasOrganization.value) {
+    errorMessage.value = "";
+    dashboard.value = null;
+    enrollments.value = [];
+    sessions.value = [];
+    isLoading.value = false;
+    return;
+  }
   errorMessage.value = "";
   isLoading.value = true;
   try {
-    await Promise.all([
-      fetchLearnerDashboard(),
-      fetchMyEnrollments().then((data) => {
-        enrollments.value = data;
-      }),
-      fetchStudySessions().then((data) => {
-        sessions.value = data;
-      }),
-    ]);
+    const [dashboardData, enrollmentData, sessionData] =
+      await Promise.all([
+        fetchLearnerDashboard(),
+        fetchMyEnrollments(),
+        fetchStudySessions(),
+      ]);
+    dashboard.value = dashboardData;
+    enrollments.value = enrollmentData;
+    sessions.value = sessionData;
   } catch (error) {
     errorMessage.value = "Unable to load dashboard data.";
   } finally {
@@ -285,4 +401,50 @@ const courseProgressCards = computed(() => {
     };
   });
 });
+
+const formatDate = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "--";
+  }
+  return parsed.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatDateTime = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "--";
+  }
+  return parsed.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const recentSessions = computed(() =>
+  (dashboard.value?.recentSessions ?? []).map((session) => ({
+    id: session.id,
+    course: session.course?.title ?? "Course",
+    module: session.module?.title ?? "General",
+    duration: session.durationMinutes,
+    date: formatDateTime(session.studiedAt),
+  }))
+);
+
+const upcomingItems = computed(() =>
+  (dashboard.value?.upcomingItems ?? []).map((item) => ({
+    id: item.id,
+    title: item.module?.title ?? "Study session",
+    course: item.course?.title ?? "Course",
+    duration: item.durationMinutes,
+    date: formatDate(item.scheduledDate),
+  }))
+);
 </script>

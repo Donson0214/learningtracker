@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useRoute } from "vue-router";
 import {
   Squares2X2Icon,
@@ -9,6 +10,7 @@ import {
   ChevronLeftIcon,
   Bars3Icon,
 } from "@heroicons/vue/24/outline";
+import { useAuthStore } from "@/features/auth/store";
 
 defineProps<{
   collapsed: boolean;
@@ -20,17 +22,37 @@ const emit = defineEmits<{
 
 const route = useRoute();
 
-const links = [
-  { to: "/admin", label: "Dashboard", icon: Squares2X2Icon },
-  {
-    to: "/admin/organization",
-    label: "Organization",
-    icon: BuildingOffice2Icon,
-  },
-  { to: "/admin/courses", label: "Courses", icon: BookOpenIcon },
-  { to: "/admin/members", label: "Members", icon: UsersIcon },
-  { to: "/admin/analytics", label: "Analytics", icon: ChartBarIcon },
-];
+const auth = useAuthStore();
+const isSystemAdmin = computed(
+  () => auth.user?.role === "SYSTEM_ADMIN"
+);
+
+const links = computed(() => {
+  if (isSystemAdmin.value) {
+    return [
+      { to: "/admin", label: "System Dashboard", icon: Squares2X2Icon },
+      {
+        to: "/admin/organizations",
+        label: "Organizations",
+        icon: BuildingOffice2Icon,
+      },
+      { to: "/admin/members", label: "Members", icon: UsersIcon },
+      { to: "/admin/courses", label: "Courses", icon: BookOpenIcon },
+    ];
+  }
+
+  return [
+    { to: "/admin", label: "Dashboard", icon: Squares2X2Icon },
+    {
+      to: "/admin/organization",
+      label: "Organization",
+      icon: BuildingOffice2Icon,
+    },
+    { to: "/admin/courses", label: "Courses", icon: BookOpenIcon },
+    { to: "/admin/members", label: "Members", icon: UsersIcon },
+    { to: "/admin/analytics", label: "Analytics", icon: ChartBarIcon },
+  ];
+});
 
 const isActiveLink = (to: string) => {
   if (to === "/admin") {
@@ -48,11 +70,11 @@ const isActiveLink = (to: string) => {
       collapsed ? 'w-20' : 'w-64',
     ]"
   >
-    <div class="p-4">
-      <div v-if="collapsed" class="flex items-center">
+    <div :class="collapsed ? 'px-3 py-4' : 'p-4'">
+      <div v-if="collapsed" class="flex items-center justify-center">
         <button
           type="button"
-          class="text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-slate-100"
+          class="flex h-10 w-10 items-center justify-center text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-slate-100"
           aria-label="Expand sidebar"
           @click="emit('toggle-sidebar')"
         >

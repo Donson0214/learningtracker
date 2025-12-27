@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ClockIcon, BookOpenIcon } from "@heroicons/vue/24/outline";
 
+defineEmits<{
+  (event: "action"): void;
+}>();
+
 defineProps<{
   title: string;
   description: string;
@@ -9,6 +13,7 @@ defineProps<{
   modules: number;
   cta: string;
   to?: string;
+  disabled?: boolean;
 }>();
 </script>
 
@@ -61,6 +66,9 @@ defineProps<{
       v-else
       class="mt-auto w-full bg-gradient-to-r from-gray-900 to-black text-white py-2 rounded-lg text-sm font-medium"
       type="button"
+      :disabled="disabled"
+      :class="{ 'opacity-70 cursor-not-allowed': disabled }"
+      @click="$emit('action')"
     >
       {{ cta }}
     </button>

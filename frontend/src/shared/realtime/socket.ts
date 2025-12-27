@@ -105,7 +105,7 @@ export const connectRealtime = (token: string) => {
 
   socket.addEventListener("close", (event) => {
     socket = null;
-    if (event.code === 4401) {
+    if ([4401, 4403, 4404].includes(event.code)) {
       authBlocked = true;
       return;
     }

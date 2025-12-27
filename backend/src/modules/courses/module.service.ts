@@ -23,6 +23,18 @@ export const getModulesByCourse = async (courseId: string) => {
   });
 };
 
+export const getModuleByIdForOrg = async (
+  moduleId: string,
+  organizationId: string
+) => {
+  return prisma.module.findFirst({
+    where: {
+      id: moduleId,
+      course: { organizationId },
+    },
+  });
+};
+
 export const updateModule = async (
   moduleId: string,
   data: {

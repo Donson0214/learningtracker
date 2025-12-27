@@ -16,6 +16,7 @@
                px-4 py-2 text-sm font-medium
                hover:bg-gray-100 transition
                inline-flex items-center gap-2"
+        :disabled="!hasOrganization"
         @click="openGenerator"
       >
         <ArrowPathIcon class="h-4 w-4 text-gray-500" />
@@ -31,55 +32,59 @@
       :message="errorMessage"
     />
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-      <PlanStatCard label="Total Tasks" :value="totalTasks" />
-      <PlanStatCard label="Completed" :value="completedTasks" highlight />
-      <PlanStatCard label="Target Date" :value="targetDateLabel" />
-    </div>
+    <NoOrganizationState v-if="!hasOrganization" class="mb-6" />
 
-    <!-- Plan -->
-    <div class="bg-white border border-gray-200 rounded-xl">
-      <div class="px-4 py-4 border-b border-gray-200">
-        <h3 class="font-semibold text-gray-900">
-          {{ planRangeLabel }}
-        </h3>
-        <p class="text-sm text-gray-500 mt-1">
-          {{ planItems.length }} tasks scheduled
-        </p>
+    <template v-else>
+      <!-- Stats -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <PlanStatCard label="Total Tasks" :value="totalTasks" />
+        <PlanStatCard label="Completed" :value="completedTasks" highlight />
+        <PlanStatCard label="Target Date" :value="targetDateLabel" />
       </div>
 
-      <div class="p-4 space-y-3">
-        <StateMessage
-          v-if="isLoading"
-          variant="loading"
-          title="Loading plan"
-          message="Fetching your study schedule."
-        />
+      <!-- Plan -->
+      <div class="bg-white border border-gray-200 rounded-xl">
+        <div class="px-4 py-4 border-b border-gray-200">
+          <h3 class="font-semibold text-gray-900">
+            {{ planRangeLabel }}
+          </h3>
+          <p class="text-sm text-gray-500 mt-1">
+            {{ planItems.length }} tasks scheduled
+          </p>
+        </div>
 
-        <StateMessage
-          v-else-if="planItems.length === 0"
-          variant="empty"
-          title="No study plan yet"
-          message="Generate a plan to get started."
-        />
-
-        <template v-else>
-          <StudyPlanItem
-            v-for="item in planItems"
-            :key="item.id"
-            :title="item.title"
-            :course="item.course"
-            :duration="item.duration"
-            :date="item.date"
-            :scheduled-date="item.scheduledDate"
-            :completed="item.completed"
-            @toggle="handleComplete(item)"
-            @reschedule="handleReschedule(item.id, $event)"
+        <div class="p-4 space-y-3">
+          <StateMessage
+            v-if="isLoading"
+            variant="loading"
+            title="Loading plan"
+            message="Fetching your study schedule."
           />
-        </template>
+
+          <StateMessage
+            v-else-if="planItems.length === 0"
+            variant="empty"
+            title="No study plan yet"
+            message="Generate a plan to get started."
+          />
+
+          <template v-else>
+            <StudyPlanItem
+              v-for="item in planItems"
+              :key="item.id"
+              :title="item.title"
+              :course="item.course"
+              :duration="item.duration"
+              :date="item.date"
+              :scheduled-date="item.scheduledDate"
+              :completed="item.completed"
+              @toggle="handleComplete(item)"
+              @reschedule="handleReschedule(item.id, $event)"
+            />
+          </template>
+        </div>
       </div>
-    </div>
+    </template>
 
     <Modal :open="showGenerator" title="Regenerate Study Plan" @close="closeGenerator">
       <form class="space-y-4" @submit.prevent="submitGenerator">
@@ -137,6 +142,7 @@ import StudyPlanItem from "@/components/ui/StudyPlanItem.vue";
 import Modal from "@/components/ui/Modal.vue";
 import Input from "@/components/ui/Input.vue";
 import Button from "@/components/ui/Button.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
 import {
   completePlanItem,
@@ -149,11 +155,16 @@ import { fetchStudyGoal } from "@/features/profile/api";
 import type { Enrollment, StudyPlan, StudyPlanItem as PlanItem } from "@/shared/types";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
+import { useAuthStore } from "@/features/auth/store";
 
+const auth = useAuthStore();
 const plans = ref<StudyPlan[]>([]);
 const enrollments = ref<Enrollment[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
+const hasOrganization = computed(
+  () => Boolean(auth.user?.organization)
+);
 
 const showGenerator = ref(false);
 const hoursPerWeek = ref<number | null>(10);
@@ -162,6 +173,13 @@ const selectedCourseIds = ref<string[]>([]);
 const isGenerating = ref(false);
 
 const loadData = async () => {
+  if (!hasOrganization.value) {
+    errorMessage.value = "";
+    plans.value = [];
+    enrollments.value = [];
+    isLoading.value = false;
+    return;
+  }
   errorMessage.value = "";
   isLoading.value = true;
   try {

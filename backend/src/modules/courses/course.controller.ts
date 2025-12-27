@@ -3,20 +3,28 @@ import { AuthenticatedRequest } from "../../middlewares/requireAuth";
 import * as courseService from "./course.service";
 import { broadcast } from "../../realtime/realtime";
 import { buildPaginationResponse, parsePagination } from "../../utils/pagination";
+import {
+  createCourseSchema,
+  updateCourseSchema,
+} from "../../validators/course.schema";
+import { buildValidationError } from "../../utils/validation";
 
 export const createCourse = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const { title, description, estimatedHours } = req.body;
+  const parsed = createCourseSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
+  }
 
-  if (!title) {
-    return res.status(400).json({ message: "Title is required" });
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
   }
 
   const course = await courseService.createCourse(
     req.user!.organizationId!,
-    { title, description, estimatedHours }
+    parsed.data
   );
 
   if (req.user?.organizationId) {
@@ -33,10 +41,39 @@ export const listCourses = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
+  }
+
   const { page, pageSize, skip, take } = parsePagination(req.query);
   const includeModules = req.query.includeModules === "true";
+  const { items, total } =
+    req.user.role === "LEARNER"
+      ? await courseService.getCoursesForLearnerPaged(
+          req.user.id,
+          { skip, take, includeModules }
+        )
+      : await courseService.getCoursesByOrgPaged(
+          req.user.organizationId,
+          { skip, take, includeModules }
+        );
+
+  res.json(buildPaginationResponse(items, total, page, pageSize));
+};
+
+export const listCourseCatalog = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
+  }
+
+  const { page, pageSize, skip, take } = parsePagination(req.query);
+  const includeModules = req.query.includeModules === "true";
+
   const { items, total } = await courseService.getCoursesByOrgPaged(
-    req.user!.organizationId!,
+    req.user.organizationId,
     { skip, take, includeModules }
   );
 
@@ -47,10 +84,20 @@ export const getCourse = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
-  const course = await courseService.getCourseById(
-    req.params.id,
-    req.user!.organizationId!
-  );
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
+  }
+
+  const course =
+    req.user.role === "LEARNER"
+      ? await courseService.getCourseForLearnerById(
+          req.params.id,
+          req.user.id
+        )
+      : await courseService.getCourseById(
+          req.params.id,
+          req.user.organizationId
+        );
 
   if (!course) {
     return res.status(404).json({ message: "Course not found" });
@@ -63,10 +110,18 @@ export const updateCourse = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
+  }
+  const parsed = updateCourseSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(buildValidationError(parsed.error));
+  }
+
   await courseService.updateCourse(
     req.params.id,
     req.user!.organizationId!,
-    req.body
+    parsed.data
   );
 
   if (req.user?.organizationId) {
@@ -83,6 +138,10 @@ export const deleteCourse = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
+  }
+
   await courseService.deleteCourse(
     req.params.id,
     req.user!.organizationId!

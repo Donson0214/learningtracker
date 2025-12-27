@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+////////////////////////
+// ENUMS
+////////////////////////
+
+enum UserRole {
+  LEARNER
+  ORG_ADMIN
+  SYSTEM_ADMIN
+}
+
+////////////////////////
+// CORE MODELS
+////////////////////////
+
+model User {
+  id            String   @id @default(uuid())
+  firebaseUid   String   @unique
+  email         String   @unique
+  name          String?
+  role          UserRole @default(LEARNER)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  studySessions  StudySession[]
+  studyGoals     StudyGoal[]
+  studyPlans     StudyPlan[]
+  notifications  Notification[]
+  enrollments    Enrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Organization {
+  id        String @id @default(uuid())
+  name      String
+  isActive  Boolean @default(true)
+
+  users     User[]
+  courses   Course[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+////////////////////////
+// COURSE STRUCTURE
+////////////////////////
+
+model Course {
+  id             String @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  title           String
+  description     String?
+  estimatedHours  Int?
+
+  modules        Module[]
+  enrollments    Enrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Module {
+  id        String @id @default(uuid())
+  courseId  String
+  course    Course @relation(fields: [courseId], references: [id])
+
+  title     String
+  order     Int
+
+  lessons   Lesson[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lesson {
+  id        String @id @default(uuid())
+  moduleId  String
+  module    Module @relation(fields: [moduleId], references: [id])
+
+  title            String
+  estimatedMinutes Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+////////////////////////
+// ENROLLMENTS
+////////////////////////
+
+model Enrollment {
+  id        String @id @default(uuid())
+  userId    String
+  courseId  String
+
+  user      User   @relation(fields: [userId], references: [id])
+  course    Course @relation(fields: [courseId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+////////////////////////
+// STUDY TRACKING
+////////////////////////
+
+model StudySession {
+  id        String @id @default(uuid())
+  userId    String
+  courseId  String
+  moduleId  String?
+
+  durationMinutes Int
+  notes           String?
+  mood            String?
+  studiedAt       DateTime
+
+  user    User    @relation(fields: [userId], references: [id])
+  course  Course @relation(fields: [courseId], references: [id])
+  module  Module? @relation(fields: [moduleId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, studiedAt])
+}
+
+model StudyGoal {
+  id        String @id @default(uuid())
+  userId    String
+
+  hoursPerWeek        Int
+  targetCompletionAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+////////////////////////
+// STUDY PLANS (AI)
+////////////////////////
+
+model StudyPlan {
+  id        String @id @default(uuid())
+  userId    String
+
+  startDate DateTime
+  endDate   DateTime
+
+  user  User  @relation(fields: [userId], references: [id])
+  items StudyPlanItem[]
+
+  createdAt DateTime @default(now())
+}
+
+model StudyPlanItem {
+  id          String @id @default(uuid())
+  studyPlanId String
+
+  courseId  String
+  moduleId  String?
+
+  scheduledDate DateTime
+  durationMinutes Int
+  isCompleted Boolean @default(false)
+
+  studyPlan StudyPlan @relation(fields: [studyPlanId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+  module    Module?  @relation(fields: [moduleId], references: [id])
+}
+
+////////////////////////
+// NOTIFICATIONS
+////////////////////////
+
+model Notification {
+  id      String @id @default(uuid())
+  userId  String
+
+  title   String
+  body    String
+  isRead  Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+////////////////////////
+// DEVICE TOKENS (FCM)
+////////////////////////
+
+model DeviceToken {
+  id     String @id @default(uuid())
+  userId String
+  token  String
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, token])
+}

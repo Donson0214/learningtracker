@@ -145,6 +145,43 @@
         </button>
       </div>
     </div>
+
+    <div
+      v-if="!auth.user?.organization"
+      class="mt-6 bg-white border border-gray-200 rounded-xl p-6"
+    >
+      <div class="mb-4">
+        <h3 class="font-semibold text-gray-900">Create Organization</h3>
+        <p class="text-sm text-gray-500">
+          Set up your organization to start managing courses and learners.
+        </p>
+      </div>
+
+      <div v-if="orgErrorMessage" class="mb-3 text-sm text-rose-600">
+        {{ orgErrorMessage }}
+      </div>
+      <div v-if="orgSuccessMessage" class="mb-3 text-sm text-emerald-600">
+        {{ orgSuccessMessage }}
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <input
+          v-model="orgName"
+          class="flex-1 border border-gray-200 bg-gray-50 rounded-lg
+                 px-3 py-2 text-sm text-gray-900"
+          placeholder="Organization name"
+        />
+        <button
+          class="bg-gray-900 text-white
+                 px-4 py-2 rounded-lg
+                 text-sm font-medium hover:bg-gray-800 disabled:opacity-70"
+          :disabled="isCreatingOrg"
+          @click="createOrg"
+        >
+          {{ isCreatingOrg ? "Creating..." : "Create Organization" }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -157,6 +194,7 @@ import {
   UserIcon,
 } from "@heroicons/vue/24/outline";
 import { useAuthStore } from "@/features/auth/store";
+import { createOrganization } from "@/features/admin/organization/api";
 import { createStudyGoal, fetchStudyGoal, updateStudyGoal } from "../api";
 import type { StudyGoal } from "@/shared/types";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
@@ -167,6 +205,10 @@ const hoursPerWeek = ref<number | null>(null);
 const targetDate = ref("");
 const isSaving = ref(false);
 const errorMessage = ref("");
+const orgName = ref("");
+const isCreatingOrg = ref(false);
+const orgErrorMessage = ref("");
+const orgSuccessMessage = ref("");
 
 const loadGoal = async () => {
   errorMessage.value = "";
@@ -187,7 +229,9 @@ useRealtimeRefresh(["studyGoals.changed", "users.changed"], loadGoal);
 
 const roleLabel = computed(() => {
   if (!auth.user?.role) return "Learner";
-  return auth.user.role === "ORG_ADMIN" ? "Admin" : "Learner";
+  if (auth.user.role === "ORG_ADMIN") return "Admin";
+  if (auth.user.role === "SYSTEM_ADMIN") return "System Admin";
+  return "Learner";
 });
 
 const saveGoal = async () => {
@@ -215,6 +259,28 @@ const saveGoal = async () => {
     errorMessage.value = "Unable to save goals.";
   } finally {
     isSaving.value = false;
+  }
+};
+
+const createOrg = async () => {
+  orgErrorMessage.value = "";
+  orgSuccessMessage.value = "";
+  if (!orgName.value.trim()) {
+    orgErrorMessage.value = "Organization name is required.";
+    return;
+  }
+
+  isCreatingOrg.value = true;
+  try {
+    await createOrganization(orgName.value.trim());
+    await auth.refreshProfile();
+    orgSuccessMessage.value =
+      "Organization created. You are now an admin.";
+    orgName.value = "";
+  } catch (error) {
+    orgErrorMessage.value = "Unable to create organization.";
+  } finally {
+    isCreatingOrg.value = false;
   }
 };
 </script>

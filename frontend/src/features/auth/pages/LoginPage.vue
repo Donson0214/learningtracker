@@ -3,15 +3,18 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/features/auth/store";
 import {
-  AcademicCapIcon,
-  BookOpenIcon,
-  LightBulbIcon,
   EnvelopeIcon,
   LockClosedIcon,
   EyeIcon,
   EyeSlashIcon,
   ArrowRightIcon,
 } from "@heroicons/vue/24/outline";
+import AppLogo from "@/components/ui/AppLogo.vue";
+
+const authBgUrl = new URL(
+  "@/assets/auth-background.svg",
+  import.meta.url
+).toString();
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -49,6 +52,17 @@ const formatAuthError = (error: unknown) => {
     };
     if (googleMap[code]) {
       return googleMap[code];
+    }
+    const firebaseMap: Record<string, string> = {
+      "auth/user-not-found": "Invalid email or password.",
+      "auth/wrong-password": "Invalid email or password.",
+      "auth/invalid-credential": "Invalid email or password.",
+      "auth/invalid-email": "Invalid email address.",
+      "auth/user-disabled": "This account has been disabled.",
+      "auth/too-many-requests": "Too many attempts. Try again later.",
+    };
+    if (firebaseMap[code]) {
+      return firebaseMap[code];
     }
   }
 
@@ -118,163 +132,120 @@ const handleGoogleSignIn = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden bg-[#050b17] text-slate-100">
-    <div
-      class="absolute inset-0"
-      style="
-        background-image:
-          radial-gradient(900px 500px at 15% 15%, rgba(56, 189, 248, 0.18), transparent 60%),
-          radial-gradient(800px 480px at 85% 85%, rgba(14, 165, 233, 0.16), transparent 60%);
-      "
-    ></div>
-    <div
-      class="absolute inset-0 opacity-20"
-      style="
-        background-image:
-          repeating-linear-gradient(
-            to bottom,
-            rgba(255, 255, 255, 0.07),
-            rgba(255, 255, 255, 0.07) 1px,
-            transparent 1px,
-            transparent 22px
-          );
-      "
-    ></div>
-
-    <div class="relative z-10 flex min-h-screen items-center justify-center p-6">
+  <div class="relative min-h-screen overflow-hidden text-white">
+    <div class="absolute inset-0">
       <div
-        class="w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700/60
-               bg-slate-900/70 shadow-2xl grid grid-cols-1 lg:grid-cols-[1.1fr,0.9fr]"
-        style="font-family: var(--font-body);"
-      >
-        <section class="relative p-8 lg:p-10">
+        class="absolute inset-0 bg-cover bg-center scale-105"
+        :style="{ backgroundImage: `url(${authBgUrl})` }"
+      ></div>
+      <div class="absolute inset-0 bg-black/60"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70"
+      ></div>
+    </div>
+
+    <div class="relative z-10 flex min-h-screen items-center justify-center px-4 py-12">
+      <div class="w-full max-w-sm">
+        <div
+          class="rounded-3xl border border-white/15 bg-white/10 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.6)]
+                 backdrop-blur-2xl sm:p-8 card-float"
+        >
+          <div class="text-center space-y-2">
           <div
-            class="absolute inset-0"
-            style="
-              background-image:
-                linear-gradient(120deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.55)),
-                radial-gradient(circle at top left, rgba(56, 189, 248, 0.2), transparent 55%);
-            "
-          ></div>
-          <div class="relative z-10">
-            <div class="flex items-center gap-3">
-              <div
-                class="h-10 w-10 rounded-lg bg-sky-500/80 text-white
-                       flex items-center justify-center text-sm font-semibold"
-              >
-                LT
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-slate-300">
-                  Learning Tracker
-                </p>
-                <h1
-                  class="text-3xl font-semibold text-slate-100"
-                  style="font-family: var(--font-display);"
-                >
-                  Welcome back
-                </h1>
-              </div>
-            </div>
-
-            <p class="mt-4 text-sm text-slate-200 max-w-sm">
-              Build momentum with focused study plans, curated lessons, and
-              progress snapshots that keep every milestone in sight.
-            </p>
-
-            <ul class="mt-6 space-y-3 text-sm text-slate-200">
-              <li class="flex items-center gap-2">
-                <AcademicCapIcon class="h-4 w-4 text-sky-300" />
-                Structured learning paths and weekly goals
-              </li>
-              <li class="flex items-center gap-2">
-                <BookOpenIcon class="h-4 w-4 text-sky-300" />
-                Course libraries tailored to each learner
-              </li>
-              <li class="flex items-center gap-2">
-                <LightBulbIcon class="h-4 w-4 text-sky-300" />
-                Smart insights to improve study habits
-              </li>
-            </ul>
-
-            <div class="mt-8 grid grid-cols-3 gap-3">
-              <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3">
-                <p class="text-[11px] uppercase tracking-wide text-slate-400">
-                  Focus Hours
-                </p>
-                <p class="text-lg font-semibold text-slate-100">124h</p>
-              </div>
-              <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3">
-                <p class="text-[11px] uppercase tracking-wide text-slate-400">
-                  Active Paths
-                </p>
-                <p class="text-lg font-semibold text-slate-100">6</p>
-              </div>
-              <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3">
-                <p class="text-[11px] uppercase tracking-wide text-slate-400">
-                  Streak
-                </p>
-                <p class="text-lg font-semibold text-slate-100">12 days</p>
-              </div>
-            </div>
+            class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/90 text-zinc-900
+                     text-sm font-semibold shadow-lg"
+          >
+            <AppLogo class="h-6 w-6" />
           </div>
-        </section>
-
-        <section class="bg-slate-950/80 p-8 lg:p-10">
-          <div class="mb-6">
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Sign in
+            <h1 class="text-2xl font-semibold tracking-tight">Trackademy</h1>
+            <p class="text-xs text-white/70">
+              Enter your details to log in to your account.
             </p>
-            <h2
-              class="text-2xl font-semibold text-white mt-2"
-              style="font-family: var(--font-display);"
-            >
-              Continue your learning journey
-            </h2>
+          </div>
+
+          <div class="mt-6 space-y-3">
+          <button
+            type="button"
+            class="w-full rounded-xl border border-white/15 bg-white/10 py-2 text-xs font-semibold
+                   shadow-sm transition hover:bg-white/20"
+            :disabled="isGoogleSubmitting"
+            @click="handleGoogleSignIn"
+          >
+            <span class="inline-flex items-center gap-2">
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+              >
+                <path
+                  fill="#EA4335"
+                  d="M24 9.5c3.54 0 6.72 1.23 9.22 3.64l6.9-6.9C35.96 2.34 30.31 0 24 0 14.6 0 6.51 5.38 2.52 13.22l8.04 6.24C12.6 13.09 17.87 9.5 24 9.5z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M46.98 24.55c0-1.57-.14-3.08-.4-4.55H24v9.02h12.94c-.58 3.02-2.23 5.58-4.73 7.3l7.3 5.66c4.27-3.94 6.47-9.75 6.47-17.43z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M10.56 28.47c-.54-1.6-.85-3.31-.85-5.07 0-1.76.31-3.47.85-5.07l-8.04-6.24C.93 15.7 0 19.74 0 24c0 4.26.93 8.3 2.52 11.91l8.04-6.24z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M24 48c6.48 0 11.93-2.13 15.9-5.81l-7.3-5.66c-2.02 1.36-4.6 2.16-8.6 2.16-6.13 0-11.4-3.59-13.44-8.74l-8.04 6.24C6.51 42.62 14.6 48 24 48z"
+                />
+              </svg>
+              Continue Google
+            </span>
+          </button>
+          </div>
+
+          <div class="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-white/50">
+            <span class="h-px flex-1 bg-white/15"></span>
+            or
+            <span class="h-px flex-1 bg-white/15"></span>
           </div>
 
           <form class="space-y-4" @submit.prevent="handleSubmit">
-            <p v-if="errorMessage" class="text-sm text-rose-300">
+            <p v-if="errorMessage" class="text-xs text-rose-300">
               {{ errorMessage }}
             </p>
-            <label class="block text-sm text-slate-300">
-              Email address
+
+            <label class="block text-xs text-white/70">
+              Email
               <div class="relative mt-2">
                 <EnvelopeIcon
-                  class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                  class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                 />
                 <input
                   v-model="email"
                   type="email"
                   autocomplete="email"
-                  placeholder="you@learning.com"
-                  class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                         pl-9 pr-3 py-2.5 text-sm text-slate-100
-                         placeholder-slate-500 focus:border-sky-400 focus:ring-2
-                         focus:ring-sky-400/30 outline-none"
+                  placeholder="Enter your email"
+                  class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-3 text-sm
+                         text-white placeholder-white/45 outline-none transition
+                         focus:border-white/40 focus:bg-white/15"
                 />
               </div>
             </label>
 
-            <label class="block text-sm text-slate-300">
+            <label class="block text-xs text-white/70">
               Password
               <div class="relative mt-2">
                 <LockClosedIcon
-                  class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                  class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                 />
                 <input
                   v-model="password"
                   :type="showPassword ? 'text' : 'password'"
                   autocomplete="current-password"
-                  placeholder="Enter your password"
-                  class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                         pl-9 pr-10 py-2.5 text-sm text-slate-100
-                         placeholder-slate-500 focus:border-sky-400 focus:ring-2
-                         focus:ring-sky-400/30 outline-none"
+                  placeholder="Enter Password"
+                  class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-10 text-sm
+                         text-white placeholder-white/45 outline-none transition
+                         focus:border-white/40 focus:bg-white/15"
                 />
                 <button
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                   @click="showPassword = !showPassword"
                 >
@@ -284,58 +255,63 @@ const handleGoogleSignIn = async () => {
               </div>
             </label>
 
-            <div class="flex items-center justify-between text-xs text-slate-400">
+            <div class="flex items-center justify-between text-[11px] text-white/60">
               <label class="inline-flex items-center gap-2">
                 <input
                   v-model="remember"
                   type="checkbox"
-                  class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-500"
+                  class="h-4 w-4 rounded border-white/30 bg-white/10 text-white"
                 />
                 Remember me
               </label>
-              <button type="button" class="hover:text-slate-200">
-                Forgot password?
+              <button type="button" class="hover:text-white">
+                Forgot Password?
               </button>
             </div>
 
             <button
               type="submit"
-              class="w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-500
-                     text-white py-2.5 text-sm font-semibold tracking-wide
-                     inline-flex items-center justify-center gap-2 disabled:opacity-70"
+              class="w-full rounded-xl bg-gradient-to-r from-zinc-400 via-zinc-500 to-zinc-600 py-2.5
+                     text-sm font-semibold text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)]
+                     transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)]
+                     disabled:opacity-70 disabled:hover:translate-y-0"
               :disabled="isSubmitting"
             >
-              {{ isSubmitting ? "Signing in..." : "Sign in" }}
-              <ArrowRightIcon class="h-4 w-4" />
+              {{ isSubmitting ? "Logging in..." : "Login" }}
+              <ArrowRightIcon class="ml-2 inline h-4 w-4" />
             </button>
           </form>
 
-          <div class="my-6 flex items-center gap-3 text-xs text-slate-500">
-            <span class="h-px flex-1 bg-slate-800"></span>
-            or
-            <span class="h-px flex-1 bg-slate-800"></span>
-          </div>
-
-          <button
-            type="button"
-            class="w-full rounded-xl border border-slate-700 bg-slate-900/60
-                   text-slate-100 py-2.5 text-sm font-semibold tracking-wide
-                   inline-flex items-center justify-center gap-2
-                   hover:border-slate-500 disabled:opacity-70"
-            :disabled="isGoogleSubmitting"
-            @click="handleGoogleSignIn"
-          >
-            {{ isGoogleSubmitting ? "Connecting..." : "Sign in with Google" }}
-          </button>
-
-          <p class="mt-6 text-sm text-slate-400">
-            New to Learning Tracker?
-            <RouterLink to="/register" class="text-sky-300 hover:text-sky-200">
-              Create an account
+          <p class="mt-5 text-center text-xs text-white/60">
+            Don’t Have An Account?
+            <RouterLink to="/register" class="text-white hover:underline">
+              Sign Up
             </RouterLink>
           </p>
-        </section>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes float-card {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.card-float {
+  animation: float-card 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-float {
+    animation: none;
+  }
+}
+</style>

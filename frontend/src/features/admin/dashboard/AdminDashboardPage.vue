@@ -24,6 +24,8 @@ import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import { useAdminAnalyticsStore } from "@/features/admin/analytics/store";
 import StateMessage from "@/components/ui/StateMessage.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
+import { useAuthStore } from "@/features/auth/store";
 
 Chart.register(
   LineController,
@@ -42,12 +44,20 @@ const hoursCanvas = ref<HTMLCanvasElement | null>(null);
 const charts: Chart[] = [];
 
 const analyticsStore = useAdminAnalyticsStore();
+const auth = useAuthStore();
 const analytics = computed(() => analyticsStore.analytics);
 const isLoading = computed(() => analyticsStore.isLoading);
 const errorMessage = computed(() => analyticsStore.errorMessage);
 const { theme } = useTheme();
+const hasActiveOrganization = computed(
+  () => Boolean(auth.user?.organization?.isActive)
+);
 
 const loadAnalytics = async () => {
+  if (!hasActiveOrganization.value) {
+    analyticsStore.clear();
+    return;
+  }
   await analyticsStore.loadAnalytics();
 };
 
@@ -176,15 +186,21 @@ const topLearners = computed(() =>
     </div>
 
     <StateMessage
-      v-if="errorMessage"
+      v-if="errorMessage && hasActiveOrganization"
       class="mb-4"
       variant="error"
       title="Something went wrong"
       :message="errorMessage"
     />
 
-    <!-- Stat Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+    <NoOrganizationState
+      v-if="!hasActiveOrganization"
+      class="mb-6"
+    />
+
+    <template v-else>
+      <!-- Stat Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
       <div class="bg-white border border-gray-200 rounded-xl p-6">
         <div class="flex justify-between items-start">
           <div>
@@ -323,5 +339,6 @@ const topLearners = computed(() =>
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>

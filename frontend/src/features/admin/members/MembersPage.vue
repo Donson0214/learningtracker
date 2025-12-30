@@ -12,6 +12,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import TableStateRow from "@/components/ui/TableStateRow.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
 import PaginationControls from "@/components/ui/PaginationControls.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
 import type { OrganizationMember } from "@/shared/types";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
@@ -41,6 +42,9 @@ const enrollmentsByUser = computed(
 );
 const isLoading = computed(() => membersStore.isLoading);
 const errorMessage = computed(() => membersStore.errorMessage);
+const hasActiveOrganization = computed(
+  () => Boolean(auth.user?.organization?.isActive)
+);
 
 const showAssignModal = ref(false);
 const selectedMember = ref<OrganizationMember | null>(null);
@@ -62,6 +66,10 @@ const confirmDialog = ref({
 const isConfirming = ref(false);
 
 const loadData = async (force = false) => {
+  if (!hasActiveOrganization.value) {
+    membersStore.clear();
+    return;
+  }
   try {
     await membersStore.loadAll({ force });
   } catch (error) {
@@ -260,7 +268,8 @@ const catalogRangeLabel = computed(() => {
                  bg-gray-900 text-white
                  px-4 py-2 rounded-lg
                  text-sm font-medium
-                 hover:bg-gray-800"
+                 hover:bg-gray-800 disabled:opacity-60"
+          :disabled="!hasActiveOrganization"
           @click="showInviteModal = true"
         >
           <UserPlusIcon class="h-4 w-4" />
@@ -271,7 +280,8 @@ const catalogRangeLabel = computed(() => {
                  border border-gray-300 text-gray-700
                  px-4 py-2 rounded-lg
                  text-sm font-medium
-                 hover:bg-gray-100"
+                 hover:bg-gray-100 disabled:opacity-60"
+          :disabled="!hasActiveOrganization"
           @click="loadData(true)"
         >
           Refresh Members
@@ -280,191 +290,202 @@ const catalogRangeLabel = computed(() => {
     </div>
 
     <StateMessage
-      v-if="errorMessage"
+      v-if="errorMessage && hasActiveOrganization"
       class="mb-4"
       variant="error"
       title="Something went wrong"
       :message="errorMessage"
     />
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-      <div class="bg-white border border-gray-200 rounded-xl p-6">
-        <p class="text-sm text-gray-500 mb-1">Total Members</p>
-        <p class="text-2xl font-semibold text-gray-900">{{ totalMembers }}</p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-6">
-        <p class="text-sm text-gray-500 mb-1">Learners</p>
-        <p class="text-2xl font-semibold text-gray-900">{{ learnerCount }}</p>
-      </div>
-      <div class="bg-white border border-gray-200 rounded-xl p-6">
-        <p class="text-sm text-gray-500 mb-1">Admins</p>
-        <p class="text-2xl font-semibold text-gray-900">{{ adminCount }}</p>
-      </div>
-    </div>
+    <NoOrganizationState
+      v-if="!hasActiveOrganization"
+      class="mb-6"
+    />
 
-    <!-- Pending Invites -->
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-8">
-      <div class="px-4 py-4 border-b border-gray-200">
-        <h3 class="font-semibold text-gray-900">Pending Invites</h3>
-        <p class="text-sm text-gray-500">
-          Invites that have not been accepted yet
-        </p>
+    <template v-else>
+      <!-- Stats -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <p class="text-sm text-gray-500 mb-1">Total Members</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ totalMembers }}</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <p class="text-sm text-gray-500 mb-1">Learners</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ learnerCount }}</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6">
+          <p class="text-sm text-gray-500 mb-1">Admins</p>
+          <p class="text-2xl font-semibold text-gray-900">{{ adminCount }}</p>
+        </div>
       </div>
 
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-500">
-          <tr>
-            <th class="text-left px-4 py-3">Email</th>
-            <th class="text-left px-4 py-3">Role</th>
-            <th class="text-left px-4 py-3">Expires</th>
-            <th class="text-left px-4 py-3">Invited By</th>
-            <th class="text-left px-4 py-3">Actions</th>
-          </tr>
-        </thead>
+      <!-- Pending Invites -->
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mb-8">
+        <div class="px-4 py-4 border-b border-gray-200">
+          <h3 class="font-semibold text-gray-900">Pending Invites</h3>
+          <p class="text-sm text-gray-500">
+            Invites that have not been accepted yet
+          </p>
+        </div>
 
-        <tbody class="divide-y">
-          <TableStateRow
-            v-if="isLoading"
-            :colspan="5"
-            variant="loading"
-            title="Loading invites"
-            message="Fetching pending invites."
-          />
-          <TableStateRow
-            v-else-if="pendingInvites.length === 0"
-            :colspan="5"
-            variant="empty"
-            title="No pending invites"
-            message="Send an invite to add a new member."
-          />
-          <tr v-for="invite in pendingInvites" :key="invite.id">
-            <td class="px-4 py-3 font-medium text-gray-900">
-              {{ invite.email }}
-            </td>
-            <td class="px-4 py-3">
-              <span
-                class="px-2 py-1 rounded-full text-xs font-medium"
-                :class="invite.role === 'ORG_ADMIN'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-700'"
-              >
-                {{ invite.role === "ORG_ADMIN" ? "Admin" : "Learner" }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-gray-500">
-              {{ new Date(invite.expiresAt).toLocaleDateString() }}
-            </td>
-            <td class="px-4 py-3 text-gray-500">
-              {{ invite.invitedBy?.name || invite.invitedBy?.email || "Admin" }}
-            </td>
-            <td class="px-4 py-3">
-              <button
-                class="text-rose-600 hover:text-rose-700 text-sm"
-                @click="requestRevokeInvite(invite.email, invite.id)"
-              >
-                Revoke
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <div class="overflow-x-auto">
+          <table class="min-w-[720px] w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500">
+            <tr>
+              <th class="text-left px-4 py-3">Email</th>
+              <th class="text-left px-4 py-3">Role</th>
+              <th class="text-left px-4 py-3">Expires</th>
+              <th class="text-left px-4 py-3">Invited By</th>
+              <th class="text-left px-4 py-3">Actions</th>
+            </tr>
+          </thead>
 
-      <PaginationControls
-        :page="membersPage"
-        :page-size="membersPageSize"
-        :total="membersTotal"
-        :total-pages="membersTotalPages"
-        :is-loading="isLoading"
-        @prev="goToMembersPage(membersPage - 1)"
-        @next="goToMembersPage(membersPage + 1)"
-      />
-    </div>
-
-    <!-- Members Table -->
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div class="px-4 py-4 border-b border-gray-200">
-        <h3 class="font-semibold text-gray-900">All Members</h3>
-        <p class="text-sm text-gray-500">
-          View and manage organization members
-        </p>
-      </div>
-
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-500">
-          <tr>
-            <th class="text-left px-4 py-3">Name</th>
-            <th class="text-left px-4 py-3">Email</th>
-            <th class="text-left px-4 py-3">Role</th>
-            <th class="text-left px-4 py-3">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody class="divide-y">
-          <TableStateRow
-            v-if="isLoading"
-            :colspan="4"
-            variant="loading"
-            title="Loading members"
-            message="Fetching organization members."
-          />
-          <TableStateRow
-            v-else-if="members.length === 0 && membersTotal > 0"
-            :colspan="4"
-            variant="empty"
-            title="No members on this page"
-            message="Try navigating to a previous page."
-          />
-          <TableStateRow
-            v-else-if="members.length === 0"
-            :colspan="4"
-            variant="empty"
-            title="No members yet"
-            message="Invite learners to grow your organization."
-          />
-          <tr v-for="member in members" :key="member.id">
-            <td class="px-4 py-3 font-medium text-gray-900">
-              {{ member.name || "Unnamed" }}
-            </td>
-            <td class="px-4 py-3 text-gray-500">
-              <div class="flex items-center gap-2">
-                <EnvelopeIcon class="h-4 w-4 text-gray-400" />
-                {{ member.email }}
-              </div>
-            </td>
-            <td class="px-4 py-3">
-              <span
-                class="px-2 py-1 rounded-full
-                       text-xs font-medium"
-                :class="member.role === 'LEARNER'
-                  ? 'bg-gray-100 text-gray-700'
-                  : 'bg-gray-900 text-white'"
-              >
-                {{ roleLabel(member.role) }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-3 text-sm text-gray-700">
-                <button
-                  class="inline-flex items-center gap-2 text-gray-700"
-                  @click="openAssignCourses(member)"
+          <tbody class="divide-y">
+            <TableStateRow
+              v-if="isLoading"
+              :colspan="5"
+              variant="loading"
+              title="Loading invites"
+              message="Fetching pending invites."
+            />
+            <TableStateRow
+              v-else-if="pendingInvites.length === 0"
+              :colspan="5"
+              variant="empty"
+              title="No pending invites"
+              message="Send an invite to add a new member."
+            />
+            <tr v-for="invite in pendingInvites" :key="invite.id">
+              <td class="px-4 py-3 font-medium text-gray-900">
+                {{ invite.email }}
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  class="px-2 py-1 rounded-full text-xs font-medium"
+                  :class="invite.role === 'ORG_ADMIN'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700'"
                 >
-                  <BookOpenIcon class="h-4 w-4" />
-                  Assign Courses
-                </button>
+                  {{ invite.role === "ORG_ADMIN" ? "Admin" : "Learner" }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                {{ new Date(invite.expiresAt).toLocaleDateString() }}
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                {{ invite.invitedBy?.name || invite.invitedBy?.email || "Admin" }}
+              </td>
+              <td class="px-4 py-3">
                 <button
-                  v-if="member.id !== auth.user?.id && member.role !== 'SYSTEM_ADMIN'"
                   class="text-rose-600 hover:text-rose-700 text-sm"
-                  @click="requestRemoveMember(member)"
+                  @click="requestRevokeInvite(invite.email, invite.id)"
                 >
-                  Remove
+                  Revoke
                 </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              </td>
+            </tr>
+          </tbody>
+          </table>
+        </div>
+
+        <PaginationControls
+          :page="membersPage"
+          :page-size="membersPageSize"
+          :total="membersTotal"
+          :total-pages="membersTotalPages"
+          :is-loading="isLoading"
+          @prev="goToMembersPage(membersPage - 1)"
+          @next="goToMembersPage(membersPage + 1)"
+        />
+      </div>
+
+      <!-- Members Table -->
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="px-4 py-4 border-b border-gray-200">
+          <h3 class="font-semibold text-gray-900">All Members</h3>
+          <p class="text-sm text-gray-500">
+            View and manage organization members
+          </p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-[640px] w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500">
+            <tr>
+              <th class="text-left px-4 py-3">Name</th>
+              <th class="text-left px-4 py-3">Email</th>
+              <th class="text-left px-4 py-3">Role</th>
+              <th class="text-left px-4 py-3">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y">
+            <TableStateRow
+              v-if="isLoading"
+              :colspan="4"
+              variant="loading"
+              title="Loading members"
+              message="Fetching organization members."
+            />
+            <TableStateRow
+              v-else-if="members.length === 0 && membersTotal > 0"
+              :colspan="4"
+              variant="empty"
+              title="No members on this page"
+              message="Try navigating to a previous page."
+            />
+            <TableStateRow
+              v-else-if="members.length === 0"
+              :colspan="4"
+              variant="empty"
+              title="No members yet"
+              message="Invite learners to grow your organization."
+            />
+            <tr v-for="member in members" :key="member.id">
+              <td class="px-4 py-3 font-medium text-gray-900">
+                {{ member.name || "Unnamed" }}
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                <div class="flex items-center gap-2">
+                  <EnvelopeIcon class="h-4 w-4 text-gray-400" />
+                  {{ member.email }}
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  class="px-2 py-1 rounded-full
+                         text-xs font-medium"
+                  :class="member.role === 'LEARNER'
+                    ? 'bg-gray-100 text-gray-700'
+                    : 'bg-gray-900 text-white'"
+                >
+                  {{ roleLabel(member.role) }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3 text-sm text-gray-700">
+                  <button
+                    class="inline-flex items-center gap-2 text-gray-700"
+                    @click="openAssignCourses(member)"
+                  >
+                    <BookOpenIcon class="h-4 w-4" />
+                    Assign Courses
+                  </button>
+                  <button
+                    v-if="member.id !== auth.user?.id && member.role !== 'SYSTEM_ADMIN'"
+                    class="text-rose-600 hover:text-rose-700 text-sm"
+                    @click="requestRemoveMember(member)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
 
     <Modal :open="showAssignModal" title="Assign Courses" @close="showAssignModal = false">
       <div v-if="selectedMember" class="space-y-4">

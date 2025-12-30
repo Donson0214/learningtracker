@@ -105,7 +105,8 @@ const lessonCountFor = (courseModules?: { lessonsCount: number }[]) => {
     </div>
 
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <table class="w-full text-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-[720px] w-full text-sm">
         <thead class="bg-gray-50 text-gray-500">
           <tr>
             <th class="text-left px-4 py-3">Course</th>
@@ -173,7 +174,8 @@ const lessonCountFor = (courseModules?: { lessonsCount: number }[]) => {
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <PaginationControls
         :page="page"

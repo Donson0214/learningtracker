@@ -37,3 +37,17 @@ export const selfUnenroll = async (courseId: string) => {
   );
   return data;
 };
+
+export const completeLesson = async (lessonId: string) => {
+  const { data } = await apiClient.post<{ success: boolean; completedAt: string }>(
+    `/courses/lessons/${lessonId}/complete`
+  );
+  return data;
+};
+
+export const clearLessonCompletion = async (lessonId: string) => {
+  const { data } = await apiClient.delete<{ success: boolean }>(
+    `/courses/lessons/${lessonId}/complete`
+  );
+  return data;
+};

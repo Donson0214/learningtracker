@@ -4,6 +4,7 @@ import type { SystemOrganization } from "@/shared/types";
 import {
   activateSystemOrganization,
   deactivateSystemOrganization,
+  deleteSystemOrganization,
   fetchSystemOrganizations,
 } from "./api";
 
@@ -92,6 +93,21 @@ export const useSystemOrganizationsStore = defineStore(
       }
     };
 
+    const remove = async (id: string) => {
+      clearError();
+      try {
+        await deleteSystemOrganization(id);
+        organizations.value = organizations.value.filter(
+          (item) => item.id !== id
+        );
+        total.value = Math.max(0, total.value - 1);
+        return true;
+      } catch (error) {
+        errorMessage.value = "Unable to delete organization.";
+        throw error;
+      }
+    };
+
     const clear = () => {
       organizations.value = [];
       total.value = 0;
@@ -111,6 +127,7 @@ export const useSystemOrganizationsStore = defineStore(
       loadOrganizations,
       activate,
       deactivate,
+      remove,
       clearError,
       clear,
     };

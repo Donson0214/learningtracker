@@ -96,6 +96,7 @@ const toExpiresAt = (expiresIn: string | number | undefined) => {
 
 export const useAuthStore = defineStore("auth", () => {
   const user = ref<User | null>(null);
+  const organizationInactive = ref(false);
   const token = ref<string | null>(null);
   const refreshToken = ref<string | null>(null);
   const expiresAt = ref<number | null>(null);
@@ -107,6 +108,13 @@ export const useAuthStore = defineStore("auth", () => {
   let refreshTimer: number | null = null;
 
   const isAuthenticated = computed(() => Boolean(token.value));
+
+  const setUser = (nextUser: User | null) => {
+    user.value = nextUser;
+    organizationInactive.value = Boolean(
+      nextUser?.organization && !nextUser.organization.isActive
+    );
+  };
 
   const stopRefreshTimer = () => {
     if (refreshTimer !== null) {
@@ -195,14 +203,16 @@ export const useAuthStore = defineStore("auth", () => {
   };
 
   const refreshSession = async () => {
-    if (!refreshToken.value) {
+    if (!refreshToken.value && !firebaseAuth.currentUser) {
       return null;
     }
     if (refreshPromise) {
       return refreshPromise;
     }
     refreshPromise = (async () => {
-      const data = await refreshFirebaseToken(refreshToken.value);
+      const data = await refreshFirebaseToken(
+        refreshToken.value ?? undefined
+      );
       const nextExpiresAt = toExpiresAt(data.expiresIn);
       applySession({
         token: data.idToken,
@@ -245,7 +255,7 @@ export const useAuthStore = defineStore("auth", () => {
           });
           await ensureFreshSession();
           try {
-            user.value = await fetchProfile();
+            setUser(await fetchProfile());
           } catch {
             applySession({
               token: null,
@@ -253,7 +263,7 @@ export const useAuthStore = defineStore("auth", () => {
               expiresAt: null,
               persist: true,
             });
-            user.value = null;
+            setUser(null);
           }
         }
         initialized.value = true;
@@ -271,6 +281,7 @@ export const useAuthStore = defineStore("auth", () => {
     password: string,
     remember = true
   ) => {
+    await setFirebasePersistence(remember);
     const data = await loginWithFirebase(email, password);
     const nextExpiresAt = toExpiresAt(data.expiresIn);
     applySession({
@@ -281,7 +292,7 @@ export const useAuthStore = defineStore("auth", () => {
       persist: true,
     });
     try {
-      user.value = await fetchProfile(data.idToken);
+      setUser(await fetchProfile(data.idToken));
     } catch (error) {
       applySession({
         token: null,
@@ -310,7 +321,7 @@ export const useAuthStore = defineStore("auth", () => {
       persist: true,
     });
     try {
-      user.value = await fetchProfile(idToken);
+      setUser(await fetchProfile(idToken));
     } catch (error) {
       applySession({
         token: null,
@@ -328,6 +339,7 @@ export const useAuthStore = defineStore("auth", () => {
     password: string,
     remember = true
   ) => {
+    await setFirebasePersistence(remember);
     const data = await registerWithFirebase(name, email, password);
     const nextExpiresAt = toExpiresAt(data.expiresIn);
     applySession({
@@ -339,7 +351,7 @@ export const useAuthStore = defineStore("auth", () => {
     });
     try {
       const profile = await fetchProfile(data.idToken);
-      user.value = name ? await updateProfile({ name }) : profile;
+      setUser(name ? await updateProfile({ name }) : profile);
     } catch (error) {
       applySession({
         token: null,
@@ -352,12 +364,12 @@ export const useAuthStore = defineStore("auth", () => {
   };
 
   const updateUserProfile = async (name: string) => {
-    user.value = await updateProfile({ name });
+    setUser(await updateProfile({ name }));
   };
 
   const refreshProfile = async () => {
     await ensureFreshSession();
-    user.value = await fetchProfile();
+    setUser(await fetchProfile());
   };
 
   const signOut = async () => {
@@ -369,11 +381,39 @@ export const useAuthStore = defineStore("auth", () => {
       expiresAt: null,
       persist: true,
     });
-    user.value = null;
+    setUser(null);
+  };
+
+  const markOrganizationInactive = () => {
+    organizationInactive.value = true;
+    if (!user.value?.organization) {
+      return;
+    }
+    user.value = {
+      ...user.value,
+      organization: {
+        ...user.value.organization,
+        isActive: false,
+      },
+    };
+  };
+
+  const markOrganizationMissing = () => {
+    organizationInactive.value = false;
+    if (!user.value) {
+      return;
+    }
+    if (user.value.organization) {
+      user.value = {
+        ...user.value,
+        organization: null,
+      };
+    }
   };
 
   return {
     user,
+    organizationInactive,
     token,
     refreshToken,
     expiresAt,
@@ -388,5 +428,7 @@ export const useAuthStore = defineStore("auth", () => {
     refreshProfile,
     signInWithGoogle,
     signOut,
+    markOrganizationInactive,
+    markOrganizationMissing,
   };
 });

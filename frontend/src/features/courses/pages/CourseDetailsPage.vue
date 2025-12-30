@@ -69,7 +69,7 @@
             {{ completionPercent }}%
           </p>
           <p class="text-xs text-gray-500 mt-1">
-            {{ completedHours }}h of {{ estimatedHours }}h
+            {{ completedLessons }} of {{ totalLessons }} lessons
           </p>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-5">
@@ -115,16 +115,23 @@
                     {{ module.title }}
                   </p>
                   <p class="text-xs text-gray-500">
-                    {{ module.lessonCount }} lessons | {{ module.estimatedMinutes }} min planned
+                    {{ module.completedLessons }} / {{ module.lessonCount }} lessons completed
                   </p>
                 </div>
                 <div class="text-right">
                   <p class="text-sm font-medium text-gray-900">
                     {{ module.percent }}%
                   </p>
-                  <p class="text-xs text-gray-500">
-                    {{ module.completedMinutes }} / {{ module.estimatedMinutes }} min
-                  </p>
+                  <span
+                    class="inline-flex items-center justify-center text-[11px] font-medium px-2 py-0.5 rounded-full"
+                    :class="module.status === 'Completed'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : module.status === 'In progress'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-gray-100 text-gray-600'"
+                  >
+                    {{ module.status }}
+                  </span>
                   <button
                     class="mt-2 text-xs text-gray-600 hover:text-gray-900"
                     @click="startSession(module.id)"
@@ -140,20 +147,42 @@
                   :key="lesson.id"
                   class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
                 >
-                  <div>
-                    <p class="text-sm font-medium text-gray-900">
-                      {{ lesson.title }}
-                    </p>
-                    <p class="text-xs text-gray-500">
-                      {{ lesson.estimatedMinutes }} min
-                    </p>
+                  <label class="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-gray-300 text-gray-900"
+                      :checked="Boolean(lesson.isCompleted)"
+                      :disabled="isLessonUpdating(lesson.id)"
+                      @change="toggleLessonCompletion(lesson.id, Boolean(lesson.isCompleted))"
+                    />
+                    <div>
+                      <p
+                        class="text-sm font-medium"
+                        :class="lesson.isCompleted ? 'line-through text-gray-400' : 'text-gray-900'"
+                      >
+                        {{ lesson.title }}
+                      </p>
+                      <p class="text-xs text-gray-500">
+                        {{ lesson.estimatedMinutes }} min
+                      </p>
+                    </div>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <button
+                      class="text-xs text-gray-600 hover:text-gray-900"
+                      @click="startSession(module.id)"
+                    >
+                      Log time
+                    </button>
+                    <span
+                      class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                      :class="lesson.isCompleted
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-gray-100 text-gray-600'"
+                    >
+                      {{ lesson.isCompleted ? "Done" : "Pending" }}
+                    </span>
                   </div>
-                  <button
-                    class="text-xs text-gray-600 hover:text-gray-900"
-                    @click="startSession(module.id)"
-                  >
-                    Log time
-                  </button>
                 </div>
 
                 <div v-if="module.lessons.length === 0" class="text-xs text-gray-500">
@@ -184,7 +213,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useCoursesStore } from "@/features/courses/store";
 import StateMessage from "@/components/ui/StateMessage.vue";
 import { fetchStudySessions } from "@/features/study-sessions/api";
-import { selfUnenroll } from "@/features/courses/api";
+import { selfUnenroll, completeLesson, clearLessonCompletion } from "@/features/courses/api";
 import type { Course, StudySession } from "@/shared/types";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
@@ -199,6 +228,7 @@ const courseSessions = ref<StudySession[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
 const isDropping = ref(false);
+const updatingLessonIds = ref<string[]>([]);
 const confirmDialog = ref({
   open: false,
   title: "",
@@ -230,6 +260,7 @@ useRealtimeRefresh(
     "courses.changed",
     "modules.changed",
     "lessons.changed",
+    "lessonProgress.changed",
     "studySessions.changed",
     "enrollments.changed",
   ],
@@ -247,69 +278,63 @@ const isEnrolled = computed(() =>
   coursesStore.enrolledCourseIds.includes(courseId.value)
 );
 
-const estimatedMinutes = computed(() =>
-  (course.value?.estimatedHours ?? 0) * 60
+const totalLessons = computed(() =>
+  course.value?.modules?.reduce(
+    (sum, module) => sum + (module.lessons?.length ?? 0),
+    0
+  ) ?? 0
 );
 
-const completedMinutes = computed(() =>
-  courseSessions.value.reduce(
-    (sum, session) => sum + session.durationMinutes,
+const completedLessons = computed(() =>
+  course.value?.modules?.reduce(
+    (sum, module) =>
+      sum + (module.lessons?.filter((lesson) => lesson.isCompleted).length ?? 0),
     0
-  )
+  ) ?? 0
 );
 
 const completionPercent = computed(() => {
-  if (!estimatedMinutes.value) {
+  if (!totalLessons.value) {
     return 0;
   }
   return Math.min(
     100,
-    Math.round((completedMinutes.value / estimatedMinutes.value) * 100)
+    Math.round((completedLessons.value / totalLessons.value) * 100)
   );
 });
-
-const completedHours = computed(() =>
-  (completedMinutes.value / 60).toFixed(1)
-);
-
-const estimatedHours = computed(() =>
-  (estimatedMinutes.value / 60).toFixed(1)
-);
 
 const moduleRows = computed(() => {
   if (!course.value?.modules) {
     return [];
   }
-  const minutesByModule = new Map<string, number>();
-  courseSessions.value.forEach((session) => {
-    if (!session.moduleId) return;
-    minutesByModule.set(
-      session.moduleId,
-      (minutesByModule.get(session.moduleId) ?? 0) + session.durationMinutes
-    );
-  });
-
   return course.value.modules
     .slice()
     .sort((a, b) => a.order - b.order)
     .map((module) => {
-      const estimated = module.lessons?.reduce(
-        (sum, lesson) => sum + lesson.estimatedMinutes,
-        0
-      ) ?? 0;
-      const completed = minutesByModule.get(module.id) ?? 0;
-      const percent = estimated
-        ? Math.min(100, Math.round((completed / estimated) * 100))
+      const lessonCount = module.lessons?.length ?? 0;
+      const completedLessons =
+        module.lessons?.filter((lesson) => lesson.isCompleted).length ?? 0;
+      const percent = lessonCount
+        ? Math.min(
+            100,
+            Math.round((completedLessons / lessonCount) * 100)
+          )
         : 0;
+      const status =
+        percent >= 100
+          ? "Completed"
+          : percent > 0
+            ? "In progress"
+            : "Not started";
 
       return {
         id: module.id,
         title: module.title,
         lessons: module.lessons ?? [],
-        lessonCount: module.lessons?.length ?? 0,
-        estimatedMinutes: estimated,
-        completedMinutes: completed,
+        lessonCount,
+        completedLessons,
         percent,
+        status,
       };
     });
 });
@@ -380,6 +405,42 @@ const dropCourse = async () => {
     errorMessage.value = "Unable to leave this course.";
   } finally {
     isDropping.value = false;
+  }
+};
+
+const isLessonUpdating = (lessonId: string) =>
+  updatingLessonIds.value.includes(lessonId);
+
+const toggleLessonCompletion = async (
+  lessonId: string,
+  isCompleted: boolean
+) => {
+  if (isLessonUpdating(lessonId)) {
+    return;
+  }
+  errorMessage.value = "";
+  updatingLessonIds.value = [...updatingLessonIds.value, lessonId];
+  const nextCompleted = !isCompleted;
+  coursesStore.setLessonCompletion(
+    lessonId,
+    nextCompleted,
+    nextCompleted ? new Date().toISOString() : null
+  );
+  try {
+    if (nextCompleted) {
+      const result = await completeLesson(lessonId);
+      coursesStore.setLessonCompletion(lessonId, true, result.completedAt);
+    } else {
+      await clearLessonCompletion(lessonId);
+      coursesStore.setLessonCompletion(lessonId, false, null);
+    }
+  } catch (error) {
+    errorMessage.value = "Unable to update lesson completion.";
+    await loadData();
+  } finally {
+    updatingLessonIds.value = updatingLessonIds.value.filter(
+      (id) => id !== lessonId
+    );
   }
 };
 </script>

@@ -14,12 +14,15 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import TableStateRow from "@/components/ui/TableStateRow.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
 import PaginationControls from "@/components/ui/PaginationControls.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
 import type { Course, Module, Lesson } from "@/shared/types";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import { useAdminCoursesStore } from "./store";
+import { useAuthStore } from "@/features/auth/store";
 
 const coursesStore = useAdminCoursesStore();
+const auth = useAuthStore();
 const courses = computed(() => coursesStore.courses);
 const isLoading = computed(() => coursesStore.isLoading);
 const errorMessage = computed(() => coursesStore.errorMessage);
@@ -27,6 +30,9 @@ const page = computed(() => coursesStore.page);
 const pageSize = computed(() => coursesStore.pageSize);
 const total = computed(() => coursesStore.total);
 const totalPages = computed(() => coursesStore.totalPages);
+const hasActiveOrganization = computed(
+  () => Boolean(auth.user?.organization?.isActive)
+);
 
 const selectedCourseId = ref<string | null>(null);
 const showCourseModal = ref(false);
@@ -64,6 +70,10 @@ const confirmDialog = ref({
 const isConfirming = ref(false);
 
 const loadCourses = async (options: { page?: number; force?: boolean } = {}) => {
+  if (!hasActiveOrganization.value) {
+    coursesStore.clear();
+    return;
+  }
   await coursesStore.loadCourses({
     page: options.page ?? page.value,
     pageSize: pageSize.value,
@@ -343,7 +353,8 @@ const goToPage = async (targetPage: number) => {
                bg-gray-900 text-white
                px-4 py-2 rounded-lg
                text-sm font-medium
-               hover:bg-gray-800"
+               hover:bg-gray-800 disabled:opacity-60"
+        :disabled="!hasActiveOrganization"
         @click="openCreateCourse"
       >
         <PlusIcon class="h-4 w-4" />
@@ -352,306 +363,315 @@ const goToPage = async (targetPage: number) => {
     </div>
 
     <StateMessage
-      v-if="errorMessage"
+      v-if="errorMessage && hasActiveOrganization"
       class="mb-4"
       variant="error"
       title="Something went wrong"
       :message="errorMessage"
     />
 
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div class="px-4 py-4 border-b border-gray-200">
-        <h3 class="font-semibold text-gray-900">All Courses</h3>
-        <p class="text-sm text-gray-500">
-          Manage your organization's course catalog
-        </p>
+    <NoOrganizationState
+      v-if="!hasActiveOrganization"
+      class="mb-6"
+    />
+
+    <template v-else>
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="px-4 py-4 border-b border-gray-200">
+          <h3 class="font-semibold text-gray-900">All Courses</h3>
+          <p class="text-sm text-gray-500">
+            Manage your organization's course catalog
+          </p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-[720px] w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500">
+            <tr>
+              <th class="text-left px-4 py-3">Course Name</th>
+              <th class="text-left px-4 py-3">Description</th>
+              <th class="text-left px-4 py-3">Duration</th>
+              <th class="text-left px-4 py-3">Modules</th>
+              <th class="text-left px-4 py-3">Status</th>
+              <th class="text-left px-4 py-3">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y">
+            <TableStateRow
+              v-if="isLoading"
+              :colspan="6"
+              variant="loading"
+              title="Loading courses"
+              message="Fetching your catalog."
+            />
+            <TableStateRow
+              v-else-if="courses.length === 0 && total > 0"
+              :colspan="6"
+              variant="empty"
+              title="No courses on this page"
+              message="Try navigating to a previous page."
+            />
+            <TableStateRow
+              v-else-if="courses.length === 0"
+              :colspan="6"
+              variant="empty"
+              title="No courses yet"
+              message="Create a course to get started."
+            />
+            <tr
+              v-for="course in courses"
+              :key="course.id"
+              class="hover:bg-gray-50"
+            >
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2 font-medium text-gray-900">
+                  <BookOpenIcon class="h-4 w-4 text-gray-500" />
+                  {{ course.title }}
+                </div>
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                {{ course.description || "No description yet." }}
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                {{ course.estimatedHours ?? 0 }}h
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                {{ course.modulesCount ?? course.modules?.length ?? 0 }}
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  class="px-2 py-1 rounded-full
+                         bg-gray-100 text-gray-700
+                         text-xs font-medium"
+                >
+                  Active
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <button
+                    class="text-gray-500 hover:text-gray-700"
+                    @click="openEditCourse(course)"
+                  >
+                    <PencilSquareIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    class="text-red-500 hover:text-red-700"
+                    @click="requestDeleteCourse(course)"
+                  >
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    class="text-gray-500 hover:text-gray-700"
+                    @click="selectedCourseId = course.id"
+                  >
+                    <SquaresPlusIcon class="h-4 w-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+          </table>
+        </div>
+
+        <PaginationControls
+          :page="page"
+          :page-size="pageSize"
+          :total="total"
+          :total-pages="totalPages"
+          :is-loading="isLoading"
+          @prev="goToPage(page - 1)"
+          @next="goToPage(page + 1)"
+        />
       </div>
 
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-500">
-          <tr>
-            <th class="text-left px-4 py-3">Course Name</th>
-            <th class="text-left px-4 py-3">Description</th>
-            <th class="text-left px-4 py-3">Duration</th>
-            <th class="text-left px-4 py-3">Modules</th>
-            <th class="text-left px-4 py-3">Status</th>
-            <th class="text-left px-4 py-3">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody class="divide-y">
-          <TableStateRow
-            v-if="isLoading"
-            :colspan="6"
-            variant="loading"
-            title="Loading courses"
-            message="Fetching your catalog."
-          />
-          <TableStateRow
-            v-else-if="courses.length === 0 && total > 0"
-            :colspan="6"
-            variant="empty"
-            title="No courses on this page"
-            message="Try navigating to a previous page."
-          />
-          <TableStateRow
-            v-else-if="courses.length === 0"
-            :colspan="6"
-            variant="empty"
-            title="No courses yet"
-            message="Create a course to get started."
-          />
-          <tr
-            v-for="course in courses"
-            :key="course.id"
-            class="hover:bg-gray-50"
+      <div v-if="selectedCourse" class="mt-6 bg-white border border-gray-200 rounded-xl p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h3 class="font-semibold text-gray-900">
+              Modules for {{ selectedCourse.title }}
+            </h3>
+            <p class="text-sm text-gray-500">
+              Manage modules and lessons for this course.
+            </p>
+          </div>
+          <button
+            class="flex items-center gap-2 text-sm text-gray-700
+                   border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
+            @click="openCreateModule"
           >
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-2 font-medium text-gray-900">
-                <BookOpenIcon class="h-4 w-4 text-gray-500" />
-                {{ course.title }}
+            <PlusIcon class="h-4 w-4" />
+            Add Module
+          </button>
+        </div>
+
+        <div v-if="selectedCourse.modules?.length" class="space-y-4">
+          <div
+            v-for="module in selectedCourse.modules"
+            :key="module.id"
+            class="border border-gray-200 rounded-lg p-4"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-gray-900">{{ module.title }}</p>
+                <p class="text-xs text-gray-500">Order {{ module.order }}</p>
               </div>
-            </td>
-            <td class="px-4 py-3 text-gray-500">
-              {{ course.description || "No description yet." }}
-            </td>
-            <td class="px-4 py-3 text-gray-500">
-              {{ course.estimatedHours ?? 0 }}h
-            </td>
-            <td class="px-4 py-3 text-gray-500">
-              {{ course.modulesCount ?? course.modules?.length ?? 0 }}
-            </td>
-            <td class="px-4 py-3">
-              <span
-                class="px-2 py-1 rounded-full
-                       bg-gray-100 text-gray-700
-                       text-xs font-medium"
-              >
-                Active
-              </span>
-            </td>
-            <td class="px-4 py-3">
               <div class="flex items-center gap-3">
                 <button
                   class="text-gray-500 hover:text-gray-700"
-                  @click="openEditCourse(course)"
+                  @click="openEditModule(module)"
                 >
                   <PencilSquareIcon class="h-4 w-4" />
                 </button>
-                <button
-                  class="text-red-500 hover:text-red-700"
-                  @click="requestDeleteCourse(course)"
-                >
-                  <TrashIcon class="h-4 w-4" />
-                </button>
+                  <button
+                    class="text-red-500 hover:text-red-700"
+                    @click="requestDeleteModule(module)"
+                  >
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
                 <button
                   class="text-gray-500 hover:text-gray-700"
-                  @click="selectedCourseId = course.id"
+                  @click="openCreateLesson(module.id)"
                 >
-                  <SquaresPlusIcon class="h-4 w-4" />
+                  <PlusIcon class="h-4 w-4" />
                 </button>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <PaginationControls
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        :is-loading="isLoading"
-        @prev="goToPage(page - 1)"
-        @next="goToPage(page + 1)"
-      />
-    </div>
-
-    <div v-if="selectedCourse" class="mt-6 bg-white border border-gray-200 rounded-xl p-6">
-      <div class="flex items-start justify-between mb-4">
-        <div>
-          <h3 class="font-semibold text-gray-900">
-            Modules for {{ selectedCourse.title }}
-          </h3>
-          <p class="text-sm text-gray-500">
-            Manage modules and lessons for this course.
-          </p>
-        </div>
-        <button
-          class="flex items-center gap-2 text-sm text-gray-700
-                 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
-          @click="openCreateModule"
-        >
-          <PlusIcon class="h-4 w-4" />
-          Add Module
-        </button>
-      </div>
-
-      <div v-if="selectedCourse.modules?.length" class="space-y-4">
-        <div
-          v-for="module in selectedCourse.modules"
-          :key="module.id"
-          class="border border-gray-200 rounded-lg p-4"
-        >
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-medium text-gray-900">{{ module.title }}</p>
-              <p class="text-xs text-gray-500">Order {{ module.order }}</p>
             </div>
-            <div class="flex items-center gap-3">
-              <button
-                class="text-gray-500 hover:text-gray-700"
-                @click="openEditModule(module)"
+
+            <div class="mt-3 space-y-2">
+              <div
+                v-for="lesson in module.lessons ?? []"
+                :key="lesson.id"
+                class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
               >
-                <PencilSquareIcon class="h-4 w-4" />
-              </button>
-                <button
-                  class="text-red-500 hover:text-red-700"
-                  @click="requestDeleteModule(module)"
-                >
-                  <TrashIcon class="h-4 w-4" />
-                </button>
-              <button
-                class="text-gray-500 hover:text-gray-700"
-                @click="openCreateLesson(module.id)"
-              >
-                <PlusIcon class="h-4 w-4" />
-              </button>
+                <div>
+                  <p class="text-sm font-medium text-gray-900">
+                    {{ lesson.title }}
+                  </p>
+                  <p class="text-xs text-gray-500">
+                    {{ lesson.estimatedMinutes }} min
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="text-gray-500 hover:text-gray-700"
+                    @click="openEditLesson(lesson)"
+                  >
+                    <PencilSquareIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    class="text-red-500 hover:text-red-700"
+                    @click="requestDeleteLesson(lesson)"
+                  >
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="!(module.lessons?.length)" class="text-xs text-gray-500">
+                No lessons yet.
+              </div>
             </div>
           </div>
+        </div>
 
-          <div class="mt-3 space-y-2">
-            <div
-              v-for="lesson in module.lessons ?? []"
-              :key="lesson.id"
-              class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+        <StateMessage
+          v-else
+          variant="empty"
+          title="No modules yet"
+          message="Add a module to structure this course."
+        />
+      </div>
+
+      <Modal :open="showCourseModal" title="Course" @close="showCourseModal = false">
+        <form class="space-y-4" @submit.prevent="saveCourse">
+          <div>
+            <label class="text-sm text-slate-300">Title</label>
+            <Input v-model="courseForm.title" placeholder="Course title" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-300">Description</label>
+            <Input v-model="courseForm.description" placeholder="Course description" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-300">Estimated hours</label>
+            <Input v-model="courseForm.estimatedHours" type="number" placeholder="12" />
+          </div>
+          <div class="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              class="text-sm text-slate-300"
+              @click="showCourseModal = false"
             >
-              <div>
-                <p class="text-sm font-medium text-gray-900">
-                  {{ lesson.title }}
-                </p>
-                <p class="text-xs text-gray-500">
-                  {{ lesson.estimatedMinutes }} min
-                </p>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  class="text-gray-500 hover:text-gray-700"
-                  @click="openEditLesson(lesson)"
-                >
-                  <PencilSquareIcon class="h-4 w-4" />
-                </button>
-                <button
-                  class="text-red-500 hover:text-red-700"
-                  @click="requestDeleteLesson(lesson)"
-                >
-                  <TrashIcon class="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div v-if="!(module.lessons?.length)" class="text-xs text-gray-500">
-              No lessons yet.
-            </div>
+              Cancel
+            </button>
+            <Button type="submit" :disabled="isSaving">
+              {{ isSaving ? "Saving..." : "Save Course" }}
+            </Button>
           </div>
-        </div>
-      </div>
+        </form>
+      </Modal>
 
-      <StateMessage
-        v-else
-        variant="empty"
-        title="No modules yet"
-        message="Add a module to structure this course."
+      <Modal :open="showModuleModal" title="Module" @close="showModuleModal = false">
+        <form class="space-y-4" @submit.prevent="saveModule">
+          <div>
+            <label class="text-sm text-slate-300">Title</label>
+            <Input v-model="moduleForm.title" placeholder="Module title" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-300">Order</label>
+            <Input v-model="moduleForm.order" type="number" placeholder="1" />
+          </div>
+          <div class="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              class="text-sm text-slate-300"
+              @click="showModuleModal = false"
+            >
+              Cancel
+            </button>
+            <Button type="submit" :disabled="isSaving">
+              {{ isSaving ? "Saving..." : "Save Module" }}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal :open="showLessonModal" title="Lesson" @close="showLessonModal = false">
+        <form class="space-y-4" @submit.prevent="saveLesson">
+          <div>
+            <label class="text-sm text-slate-300">Title</label>
+            <Input v-model="lessonForm.title" placeholder="Lesson title" />
+          </div>
+          <div>
+            <label class="text-sm text-slate-300">Estimated minutes</label>
+            <Input v-model="lessonForm.estimatedMinutes" type="number" placeholder="30" />
+          </div>
+          <div class="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              class="text-sm text-slate-300"
+              @click="showLessonModal = false"
+            >
+              Cancel
+            </button>
+            <Button type="submit" :disabled="isSaving">
+              {{ isSaving ? "Saving..." : "Save Lesson" }}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        :open="confirmDialog.open"
+        :title="confirmDialog.title"
+        :message="confirmDialog.message"
+        :confirm-label="confirmDialog.confirmLabel"
+        :confirming="isConfirming"
+        @close="closeConfirm"
+        @confirm="handleConfirm"
       />
-    </div>
-
-    <Modal :open="showCourseModal" title="Course" @close="showCourseModal = false">
-      <form class="space-y-4" @submit.prevent="saveCourse">
-        <div>
-          <label class="text-sm text-slate-300">Title</label>
-          <Input v-model="courseForm.title" placeholder="Course title" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Description</label>
-          <Input v-model="courseForm.description" placeholder="Course description" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Estimated hours</label>
-          <Input v-model="courseForm.estimatedHours" type="number" placeholder="12" />
-        </div>
-        <div class="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            class="text-sm text-slate-300"
-            @click="showCourseModal = false"
-          >
-            Cancel
-          </button>
-          <Button type="submit" :disabled="isSaving">
-            {{ isSaving ? "Saving..." : "Save Course" }}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-
-    <Modal :open="showModuleModal" title="Module" @close="showModuleModal = false">
-      <form class="space-y-4" @submit.prevent="saveModule">
-        <div>
-          <label class="text-sm text-slate-300">Title</label>
-          <Input v-model="moduleForm.title" placeholder="Module title" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Order</label>
-          <Input v-model="moduleForm.order" type="number" placeholder="1" />
-        </div>
-        <div class="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            class="text-sm text-slate-300"
-            @click="showModuleModal = false"
-          >
-            Cancel
-          </button>
-          <Button type="submit" :disabled="isSaving">
-            {{ isSaving ? "Saving..." : "Save Module" }}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-
-    <Modal :open="showLessonModal" title="Lesson" @close="showLessonModal = false">
-      <form class="space-y-4" @submit.prevent="saveLesson">
-        <div>
-          <label class="text-sm text-slate-300">Title</label>
-          <Input v-model="lessonForm.title" placeholder="Lesson title" />
-        </div>
-        <div>
-          <label class="text-sm text-slate-300">Estimated minutes</label>
-          <Input v-model="lessonForm.estimatedMinutes" type="number" placeholder="30" />
-        </div>
-        <div class="flex items-center justify-end gap-3">
-          <button
-            type="button"
-            class="text-sm text-slate-300"
-            @click="showLessonModal = false"
-          >
-            Cancel
-          </button>
-          <Button type="submit" :disabled="isSaving">
-            {{ isSaving ? "Saving..." : "Save Lesson" }}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-
-    <ConfirmDialog
-      :open="confirmDialog.open"
-      :title="confirmDialog.title"
-      :message="confirmDialog.message"
-      :confirm-label="confirmDialog.confirmLabel"
-      :confirming="isConfirming"
-      @close="closeConfirm"
-      @confirm="handleConfirm"
-    />
+    </template>
   </div>
 </template>

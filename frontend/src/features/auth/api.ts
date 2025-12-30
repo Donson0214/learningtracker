@@ -1,5 +1,11 @@
 import { apiClient } from "@/shared/api/axios";
 import type { User } from "@/shared/types";
+import { firebaseAuth } from "@/shared/firebase/firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile as updateFirebaseProfile,
+} from "firebase/auth";
 
 const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY as
   | string
@@ -25,55 +31,46 @@ type FirebaseErrorPayload = {
   };
 };
 
-const firebaseRequest = async (
-  endpoint: string,
-  payload: Record<string, unknown>
-) => {
-  if (!firebaseApiKey) {
-    throw new Error("Missing VITE_FIREBASE_API_KEY");
+const toAuthResponse = async (
+  user: {
+    uid: string;
+    email: string | null;
+    refreshToken: string;
+    getIdToken: (forceRefresh?: boolean) => Promise<string>;
+    getIdTokenResult: () => Promise<{ expirationTime: string }>;
   }
+): Promise<FirebaseAuthResponse> => {
+  const idToken = await user.getIdToken();
+  const tokenResult = await user.getIdTokenResult();
+  const expirationTime = tokenResult?.expirationTime
+    ? new Date(tokenResult.expirationTime).getTime()
+    : null;
+  const expiresIn = expirationTime
+    ? Math.max(
+        0,
+        Math.floor((expirationTime - Date.now()) / 1000)
+      ).toString()
+    : "3600";
 
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/${endpoint}?key=${firebaseApiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, returnSecureToken: true }),
-    }
-  );
-
-  const data = (await res.json()) as FirebaseAuthResponse & FirebaseErrorPayload;
-
-  if (!res.ok) {
-    const message = data.error?.message || "Authentication failed";
-    throw new Error(message);
-  }
-
-  return data;
-};
-
-const updateFirebaseProfile = async (
-  idToken: string,
-  displayName: string
-) => {
-  if (!displayName) {
-    return;
-  }
-
-  await firebaseRequest("accounts:update", {
+  return {
     idToken,
-    displayName,
-  });
+    email: user.email ?? "",
+    localId: user.uid,
+    refreshToken: user.refreshToken,
+    expiresIn,
+  };
 };
 
 export const loginWithFirebase = async (
   email: string,
   password: string
 ) => {
-  return firebaseRequest("accounts:signInWithPassword", {
+  const credential = await signInWithEmailAndPassword(
+    firebaseAuth,
     email,
-    password,
-  });
+    password
+  );
+  return toAuthResponse(credential.user);
 };
 
 export const registerWithFirebase = async (
@@ -81,15 +78,43 @@ export const registerWithFirebase = async (
   email: string,
   password: string
 ) => {
-  const data = await firebaseRequest("accounts:signUp", {
+  const credential = await createUserWithEmailAndPassword(
+    firebaseAuth,
     email,
-    password,
-  });
-  await updateFirebaseProfile(data.idToken, name);
-  return data;
+    password
+  );
+  if (name) {
+    await updateFirebaseProfile(credential.user, { displayName: name });
+    await credential.user.getIdToken(true);
+  }
+  return toAuthResponse(credential.user);
 };
 
-export const refreshFirebaseToken = async (refreshToken: string) => {
+export const refreshFirebaseToken = async (refreshToken?: string) => {
+  if (firebaseAuth.currentUser) {
+    const idToken = await firebaseAuth.currentUser.getIdToken(true);
+    const tokenResult =
+      await firebaseAuth.currentUser.getIdTokenResult();
+    const expirationTime = tokenResult?.expirationTime
+      ? new Date(tokenResult.expirationTime).getTime()
+      : null;
+    const expiresIn = expirationTime
+      ? Math.max(
+          0,
+          Math.floor((expirationTime - Date.now()) / 1000)
+        ).toString()
+      : "3600";
+
+    return {
+      idToken,
+      refreshToken: firebaseAuth.currentUser.refreshToken,
+      expiresIn,
+    };
+  }
+
+  if (!refreshToken) {
+    throw new Error("Missing refresh token");
+  }
   if (!firebaseApiKey) {
     throw new Error("Missing VITE_FIREBASE_API_KEY");
   }

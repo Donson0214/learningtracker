@@ -11,6 +11,7 @@ import {
   Bars3Icon,
 } from "@heroicons/vue/24/outline";
 import { useAuthStore } from "@/features/auth/store";
+import AppLogo from "@/components/ui/AppLogo.vue";
 
 defineProps<{
   collapsed: boolean;
@@ -65,7 +66,7 @@ const isActiveLink = (to: string) => {
 <template>
   <aside
     :class="[
-      'bg-white border-r border-gray-200 h-full shrink-0 overflow-hidden transition-all duration-200',
+      'bg-white border-r border-gray-200 h-full shrink-0 overflow-y-auto transition-all duration-200',
       'dark:bg-slate-900 dark:border-slate-800',
       collapsed ? 'w-20' : 'w-64',
     ]"
@@ -87,9 +88,9 @@ const isActiveLink = (to: string) => {
             class="h-8 w-8 rounded bg-blue-600 text-white
                    flex items-center justify-center text-sm dark:bg-sky-500"
           >
-            LT
+            <AppLogo class="h-6 w-6" />
           </div>
-          <span>Learning Tracker</span>
+          <span>Trackademy</span>
         </div>
         <button
           type="button"

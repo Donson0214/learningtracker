@@ -1,17 +1,18 @@
 <template>
   <aside
     :class="[
-      'bg-white border-r border-gray-200 h-full overflow-hidden transition-all duration-200 shrink-0',
+      'bg-white border-r border-gray-200 h-full overflow-y-auto transition-all duration-200 shrink-0',
       'dark:bg-slate-900 dark:border-slate-800',
       collapsed ? 'w-20' : 'w-64',
     ]"
   >
     <!-- Logo / Toggle -->
-    <div class="p-4">
-      <div v-if="collapsed" class="flex items-center">
+    <div :class="collapsed ? 'px-3 py-4' : 'p-4'">
+      <div v-if="collapsed" class="flex items-center justify-center">
         <button
           type="button"
-          class="text-gray-600 hover:text-gray-900 dark:text-slate-300 dark:hover:text-slate-100"
+          class="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 hover:text-gray-900
+                 dark:text-slate-300 dark:hover:text-slate-100"
           aria-label="Expand sidebar"
           @click="emit('toggle-sidebar')"
         >
@@ -23,13 +24,14 @@
           <div
             class="h-8 w-8 rounded bg-blue-600 text-white flex items-center justify-center text-sm dark:bg-sky-500"
           >
-            LT
+            <AppLogo class="h-6 w-6" />
           </div>
-          <span>Learning Tracker</span>
+          <span>Trackademy</span>
         </div>
         <button
           type="button"
-          class="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:text-gray-700
+                 dark:text-slate-400 dark:hover:text-slate-200"
           aria-label="Collapse sidebar"
           @click="emit('toggle-sidebar')"
         >
@@ -103,6 +105,7 @@ import {
 
 import { useAuthStore } from "@/features/auth/store";
 import SidebarLink from "./SidebarLink.vue";
+import AppLogo from "@/components/ui/AppLogo.vue";
 
 defineProps<{
   collapsed: boolean;

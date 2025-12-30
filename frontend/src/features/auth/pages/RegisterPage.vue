@@ -3,9 +3,6 @@ import { computed, ref, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/features/auth/store";
 import {
-  AcademicCapIcon,
-  BookOpenIcon,
-  SparklesIcon,
   UserIcon,
   EnvelopeIcon,
   LockClosedIcon,
@@ -15,6 +12,12 @@ import {
   BriefcaseIcon,
   ArrowRightIcon,
 } from "@heroicons/vue/24/outline";
+import AppLogo from "@/components/ui/AppLogo.vue";
+
+const authBgUrl = new URL(
+  "@/assets/auth-background.svg",
+  import.meta.url
+).toString();
 
 const route = useRoute();
 const router = useRouter();
@@ -43,6 +46,17 @@ watchEffect(() => {
 });
 
 const formatAuthError = (error: unknown) => {
+  if (error && typeof (error as { code?: string }).code === "string") {
+    const code = (error as { code: string }).code;
+    const firebaseMap: Record<string, string> = {
+      "auth/email-already-in-use": "An account with this email already exists.",
+      "auth/weak-password": "Password should be at least 6 characters.",
+      "auth/invalid-email": "Invalid email address.",
+    };
+    if (firebaseMap[code]) {
+      return firebaseMap[code];
+    }
+  }
   if (error instanceof Error) {
     const message = error.message;
     if (message === "EMAIL_EXISTS") {
@@ -102,192 +116,115 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden bg-[#050b17] text-slate-100">
-    <div
-      class="absolute inset-0"
-      style="
-        background-image:
-          radial-gradient(900px 500px at 20% 20%, rgba(56, 189, 248, 0.18), transparent 60%),
-          radial-gradient(900px 500px at 80% 80%, rgba(16, 185, 129, 0.14), transparent 60%);
-      "
-    ></div>
-    <div
-      class="absolute inset-0 opacity-20"
-      style="
-        background-image:
-          repeating-linear-gradient(
-            to right,
-            rgba(255, 255, 255, 0.06),
-            rgba(255, 255, 255, 0.06) 1px,
-            transparent 1px,
-            transparent 26px
-          );
-      "
-    ></div>
-
-    <div class="relative z-10 flex min-h-screen items-center justify-center p-6">
+  <div class="relative min-h-screen overflow-hidden text-white">
+    <div class="absolute inset-0">
       <div
-        class="w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-700/60
-               bg-slate-900/70 shadow-2xl grid grid-cols-1 lg:grid-cols-[1.1fr,0.9fr]"
-        style="font-family: var(--font-body);"
-      >
-        <section class="relative p-8 lg:p-10">
+        class="absolute inset-0 bg-cover bg-center scale-105"
+        :style="{ backgroundImage: `url(${authBgUrl})` }"
+      ></div>
+      <div class="absolute inset-0 bg-black/60"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70"
+      ></div>
+    </div>
+
+    <div class="relative z-10 flex min-h-screen items-center justify-center px-4 py-12">
+      <div class="w-full max-w-sm">
+        <div
+          class="rounded-3xl border border-white/15 bg-white/10 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.6)]
+                 backdrop-blur-2xl sm:p-8 card-float"
+        >
+          <div class="text-center space-y-2">
           <div
-            class="absolute inset-0"
-            style="
-              background-image:
-                linear-gradient(120deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.6)),
-                radial-gradient(circle at top right, rgba(16, 185, 129, 0.2), transparent 55%);
-            "
-          ></div>
-          <div class="relative z-10">
-            <div class="flex items-center gap-3">
-              <div
-                class="h-10 w-10 rounded-lg bg-emerald-500/80 text-white
-                       flex items-center justify-center text-sm font-semibold"
-              >
-                LT
-              </div>
-              <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-slate-300">
-                  Learning Tracker
-                </p>
-                <h1
-                  class="text-3xl font-semibold text-slate-100"
-                  style="font-family: var(--font-display);"
-                >
-                  {{ isEditMode ? "Update your profile" : "Start learning today" }}
-                </h1>
-              </div>
-            </div>
-
-            <p class="mt-4 text-sm text-slate-200 max-w-sm">
-              Build a personalized learning space with weekly goals, skill paths,
-              and progress analytics that keep your momentum strong.
-            </p>
-
-            <ul class="mt-6 space-y-3 text-sm text-slate-200">
-              <li class="flex items-center gap-2">
-                <AcademicCapIcon class="h-4 w-4 text-emerald-300" />
-                Personalized study plans and reminders
-              </li>
-              <li class="flex items-center gap-2">
-                <BookOpenIcon class="h-4 w-4 text-emerald-300" />
-                Curated courses and structured modules
-              </li>
-              <li class="flex items-center gap-2">
-                <SparklesIcon class="h-4 w-4 text-emerald-300" />
-                Milestones that celebrate every win
-              </li>
-            </ul>
-
-            <div class="mt-8 grid grid-cols-2 gap-3">
-              <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3">
-                <p class="text-[11px] uppercase tracking-wide text-slate-400">
-                  Weekly Goals
-                </p>
-                <p class="text-lg font-semibold text-slate-100">10 hours</p>
-              </div>
-              <div class="rounded-xl border border-slate-700/50 bg-slate-950/40 p-3">
-                <p class="text-[11px] uppercase tracking-wide text-slate-400">
-                  Progress View
-                </p>
-                <p class="text-lg font-semibold text-slate-100">Real time</p>
-              </div>
-            </div>
+            class="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/90 text-zinc-900
+                     text-sm font-semibold shadow-lg"
+          >
+            <AppLogo class="h-6 w-6" />
           </div>
-        </section>
-
-        <section class="bg-slate-950/80 p-8 lg:p-10">
-          <div class="mb-6">
-            <p class="text-xs uppercase tracking-[0.2em] text-slate-400">
-              {{ isEditMode ? "Edit profile" : "Sign up" }}
+            <h1 class="text-2xl font-semibold tracking-tight">
+              {{ isEditMode ? "Update Profile" : "Create Account" }}
+            </h1>
+            <p class="text-xs text-white/70">
+              {{
+                isEditMode
+                  ? "Keep your details up to date."
+                  : "Start tracking your learning journey."
+              }}    
             </p>
-            <h2
-              class="text-2xl font-semibold text-white mt-2"
-              style="font-family: var(--font-display);"
-            >
-              {{ isEditMode ? "Update your details" : "Create your account" }}
-            </h2>
           </div>
 
-          <form class="space-y-4" @submit.prevent="handleSubmit">
-            <p v-if="errorMessage" class="text-sm text-rose-300">
+          <form class="mt-6 space-y-4" @submit.prevent="handleSubmit">
+            <p v-if="errorMessage" class="text-xs text-rose-300">
               {{ errorMessage }}
             </p>
-            <label class="block text-sm text-slate-300">
+
+            <label class="block text-xs text-white/70">
               Full name
               <div class="relative mt-2">
                 <UserIcon
-                  class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                  class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                 />
                 <input
                   v-model="fullName"
                   type="text"
                   autocomplete="name"
-                  placeholder="Your name"
-                  class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                         pl-9 pr-3 py-2.5 text-sm text-slate-100
-                         placeholder-slate-500 focus:border-emerald-400 focus:ring-2
-                         focus:ring-emerald-400/30 outline-none"
+                  placeholder="Enter your name"
+                  class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-3 text-sm
+                         text-white placeholder-white/45 outline-none transition
+                         focus:border-white/40 focus:bg-white/15"
                 />
               </div>
             </label>
 
-            <label class="block text-sm text-slate-300">
-              Email address
+            <label class="block text-xs text-white/70">
+              Email
               <div class="relative mt-2">
                 <EnvelopeIcon
-                  class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                  class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                 />
                 <input
                   v-model="email"
                   type="email"
                   autocomplete="email"
-                  placeholder="you@learning.com"
-                  class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                         pl-9 pr-3 py-2.5 text-sm text-slate-100
-                         placeholder-slate-500 focus:border-emerald-400 focus:ring-2
-                         focus:ring-emerald-400/30 outline-none"
+                  placeholder="Enter your email"
+                  class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-3 text-sm
+                         text-white placeholder-white/45 outline-none transition
+                         focus:border-white/40 focus:bg-white/15"
                   :disabled="isEditMode"
                 />
               </div>
             </label>
 
             <div v-if="isEditMode" class="space-y-4">
-              <label class="block text-sm text-slate-300">
+              <label class="block text-xs text-white/70">
                 Organization
                 <div class="relative mt-2">
                   <BuildingOffice2Icon
-                    class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                    class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                   />
                   <input
                     v-model="organization"
                     type="text"
-                    placeholder="Your organization"
-                    class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                           pl-9 pr-3 py-2.5 text-sm text-slate-100
-                           placeholder-slate-500 focus:border-emerald-400 focus:ring-2
-                           focus:ring-emerald-400/30 outline-none"
+                    class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-3 text-sm
+                           text-white placeholder-white/45 outline-none transition
+                           focus:border-white/40 focus:bg-white/15"
                     disabled
                   />
                 </div>
               </label>
 
-              <label class="block text-sm text-slate-300">
+              <label class="block text-xs text-white/70">
                 Role
                 <div class="relative mt-2">
                   <BriefcaseIcon
-                    class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                    class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                   />
                   <input
                     v-model="role"
                     type="text"
-                    placeholder="Role"
-                    class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                           pl-9 pr-3 py-2.5 text-sm text-slate-100
-                           placeholder-slate-500 focus:border-emerald-400 focus:ring-2
-                           focus:ring-emerald-400/30 outline-none"
+                    class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-3 text-sm
+                           text-white placeholder-white/45 outline-none transition
+                           focus:border-white/40 focus:bg-white/15"
                     disabled
                   />
                 </div>
@@ -295,25 +232,24 @@ const handleSubmit = async () => {
             </div>
 
             <div v-else class="space-y-4">
-              <label class="block text-sm text-slate-300">
+              <label class="block text-xs text-white/70">
                 Password
                 <div class="relative mt-2">
                   <LockClosedIcon
-                    class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                    class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                   />
                   <input
                     v-model="password"
                     :type="showPassword ? 'text' : 'password'"
                     autocomplete="new-password"
-                    placeholder="Create a password"
-                    class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                           pl-9 pr-10 py-2.5 text-sm text-slate-100
-                           placeholder-slate-500 focus:border-emerald-400 focus:ring-2
-                           focus:ring-emerald-400/30 outline-none"
+                    placeholder="Create password"
+                    class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-10 text-sm
+                           text-white placeholder-white/45 outline-none transition
+                           focus:border-white/40 focus:bg-white/15"
                   />
                   <button
                     type="button"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
                     :aria-label="showPassword ? 'Hide password' : 'Show password'"
                     @click="showPassword = !showPassword"
                   >
@@ -323,25 +259,24 @@ const handleSubmit = async () => {
                 </div>
               </label>
 
-              <label class="block text-sm text-slate-300">
+              <label class="block text-xs text-white/70">
                 Confirm password
                 <div class="relative mt-2">
                   <LockClosedIcon
-                    class="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                    class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                   />
                   <input
                     v-model="confirmPassword"
                     :type="showConfirmPassword ? 'text' : 'password'"
                     autocomplete="new-password"
-                    placeholder="Re-enter your password"
-                    class="w-full rounded-xl border border-slate-700 bg-slate-900/70
-                           pl-9 pr-10 py-2.5 text-sm text-slate-100
-                           placeholder-slate-500 focus:border-emerald-400 focus:ring-2
-                           focus:ring-emerald-400/30 outline-none"
+                    placeholder="Confirm password"
+                    class="w-full rounded-xl border border-white/15 bg-white/10 py-2 pl-9 pr-10 text-sm
+                           text-white placeholder-white/45 outline-none transition
+                           focus:border-white/40 focus:bg-white/15"
                   />
                   <button
                     type="button"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
                     :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
                     @click="showConfirmPassword = !showConfirmPassword"
                   >
@@ -354,9 +289,10 @@ const handleSubmit = async () => {
 
             <button
               type="submit"
-              class="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500
-                     text-white py-2.5 text-sm font-semibold tracking-wide
-                     inline-flex items-center justify-center gap-2 disabled:opacity-70"
+              class="w-full rounded-xl bg-gradient-to-r from-zinc-400 via-zinc-500 to-zinc-600 py-2.5
+                     text-sm font-semibold text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)]
+                     transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(0,0,0,0.45)]
+                     disabled:opacity-70 disabled:hover:translate-y-0"
               :disabled="isSubmitting"
             >
               {{
@@ -368,21 +304,40 @@ const handleSubmit = async () => {
                     ? "Save Profile"
                     : "Create Account"
               }}
-              <ArrowRightIcon class="h-4 w-4" />
+              <ArrowRightIcon class="ml-2 inline h-4 w-4" />
             </button>
           </form>
 
-          <p class="mt-6 text-sm text-slate-400">
+          <p class="mt-5 text-center text-xs text-white/60">
             {{ isEditMode ? "Need to update credentials?" : "Already have an account?" }}
-            <RouterLink
-              :to="isEditMode ? '/profile' : '/login'"
-              class="text-emerald-300 hover:text-emerald-200"
-            >
+            <RouterLink to="/login" class="text-white hover:underline">
               {{ isEditMode ? "Back to profile" : "Sign in instead" }}
             </RouterLink>
           </p>
-        </section>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes float-card {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.card-float {
+  animation: float-card 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-float {
+    animation: none;
+  }
+}
+</style>

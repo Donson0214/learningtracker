@@ -56,3 +56,10 @@ export const deactivateSystemOrganization = async (id: string) => {
   );
   return data;
 };
+
+export const deleteSystemOrganization = async (id: string) => {
+  const { data } = await apiClient.delete<{ success: boolean }>(
+    `/system/organizations/${id}`
+  );
+  return data;
+};

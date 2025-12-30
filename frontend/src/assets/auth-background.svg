@@ -1,0 +1,55 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b1b1b"/>
+      <stop offset="55%" stop-color="#262626"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2d2a26"/>
+      <stop offset="100%" stop-color="#1f1d1a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(360 220) rotate(45) scale(360 240)">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur20" x="-200" y="-200" width="2000" height="1300" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+    <filter id="blur40" x="-200" y="-200" width="2000" height="1300" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect y="640" width="1600" height="260" fill="url(#floor)"/>
+  <rect x="0" y="0" width="1600" height="900" fill="url(#glow)"/>
+
+  <g filter="url(#blur40)" opacity="0.8">
+    <rect x="120" y="320" width="520" height="180" rx="36" fill="#3a3a3a"/>
+    <rect x="180" y="270" width="360" height="120" rx="28" fill="#444444"/>
+  </g>
+
+  <g filter="url(#blur20)" opacity="0.7">
+    <rect x="1060" y="280" width="340" height="220" rx="36" fill="#323232"/>
+    <rect x="1120" y="240" width="220" height="140" rx="24" fill="#3c3c3c"/>
+  </g>
+
+  <g filter="url(#blur20)" opacity="0.65">
+    <rect x="760" y="380" width="220" height="140" rx="24" fill="#3b3b3b"/>
+    <rect x="820" y="320" width="120" height="80" rx="18" fill="#4a4a4a"/>
+  </g>
+
+  <g opacity="0.65" filter="url(#blur20)">
+    <rect x="70" y="120" width="140" height="300" rx="70" fill="#2a2a2a"/>
+    <circle cx="140" cy="120" r="80" fill="#3a3a3a"/>
+  </g>
+
+  <g opacity="0.5" filter="url(#blur20)">
+    <rect x="1380" y="140" width="150" height="320" rx="75" fill="#2b2b2b"/>
+    <circle cx="1455" cy="140" r="90" fill="#3c3c3c"/>
+  </g>
+
+  <rect x="60" y="80" width="1480" height="700" rx="60" stroke="#ffffff" stroke-opacity="0.08"/>
+  <rect x="90" y="110" width="1420" height="640" rx="50" stroke="#ffffff" stroke-opacity="0.05"/>
+</svg>

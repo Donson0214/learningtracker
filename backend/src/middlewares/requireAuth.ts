@@ -36,6 +36,11 @@ const decodeJwtPayload = (token: string): JwtPayload | null => {
   }
 };
 
+const shouldCheckRevoked = () =>
+  process.env.FIREBASE_CHECK_REVOKED === "true";
+
+const isLikelyJwt = (token: string) => token.split(".").length === 3;
+
 const getFirebaseAuthErrorMessage = (
   error: unknown,
   token?: string
@@ -50,7 +55,14 @@ const getFirebaseAuthErrorMessage = (
   if (code === "auth/user-disabled") {
     return "User account is disabled.";
   }
-  if (code === "auth/invalid-id-token" || code === "auth/invalid-argument") {
+  if (
+    code === "auth/invalid-id-token" ||
+    code === "auth/invalid-argument" ||
+    code === "auth/argument-error"
+  ) {
+    if (token && !isLikelyJwt(token)) {
+      return "Token is not a Firebase ID token.";
+    }
     const expectedProject = process.env.FIREBASE_PROJECT_ID;
     const payload = token ? decodeJwtPayload(token) : null;
     if (
@@ -61,6 +73,18 @@ const getFirebaseAuthErrorMessage = (
     ) {
       return `Token project mismatch. Frontend uses ${payload.aud}, backend expects ${expectedProject}.`;
     }
+  }
+  if (code === "auth/invalid-credential") {
+    return "Firebase Admin credentials are invalid. Check service account configuration.";
+  }
+  if (code === "auth/insufficient-permission") {
+    return "Firebase Admin credentials lack permission to verify tokens.";
+  }
+  if (code === "auth/project-not-found") {
+    return "Firebase project not found. Check FIREBASE_PROJECT_ID.";
+  }
+  if (code === "auth/internal-error") {
+    return "Firebase token verification failed.";
   }
   return "Invalid or expired token";
 };
@@ -83,8 +107,14 @@ export const requireAuth = async (
 
   let decoded: { uid: string; email?: string; name?: string };
   try {
-    decoded = await firebaseAdmin.auth().verifyIdToken(token, true);
+    decoded = await firebaseAdmin
+      .auth()
+      .verifyIdToken(token, shouldCheckRevoked());
   } catch (error) {
+    const code = (error as { code?: string })?.code ?? "unknown";
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Firebase verifyIdToken failed:", code);
+    }
     return res
       .status(401)
       .json({ message: getFirebaseAuthErrorMessage(error, token) });

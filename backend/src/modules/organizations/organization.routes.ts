@@ -9,6 +9,7 @@ import {
   deactivateOrg,
   activateOrg,
   removeOrgMember,
+  deleteOrg,
 } from "./organization.controller";
 
 const router = Router();
@@ -51,6 +52,13 @@ router.delete(
   requireAuth,
   requireRole(["ORG_ADMIN"]),
   deactivateOrg
+);
+
+router.delete(
+  "/permanent",
+  requireAuth,
+  requireRole(["ORG_ADMIN"]),
+  deleteOrg
 );
 
 router.patch(

@@ -1,5 +1,24 @@
 import { prisma } from "../../prisma";
 
+const mapLessonsWithProgress = <T extends { lessonProgresses?: { completedAt: Date }[] }>(
+  lessons: T[]
+) =>
+  lessons.map(({ lessonProgresses, ...lesson }) => ({
+    ...lesson,
+    isCompleted: Boolean(lessonProgresses?.length),
+    completedAt: lessonProgresses?.[0]?.completedAt ?? null,
+  }));
+
+const mapCourseWithProgress = <T extends { modules?: Array<{ lessons?: { lessonProgresses?: { completedAt: Date }[] }[] }> }>(
+  course: T
+) => ({
+  ...course,
+  modules: course.modules?.map((module) => ({
+    ...module,
+    lessons: module.lessons ? mapLessonsWithProgress(module.lessons) : [],
+  })),
+});
+
 export const enrollUser = async (
   userId: string,
   courseId: string
@@ -48,12 +67,28 @@ export const getEnrollmentsForUser = async (
       course: {
         include: {
           modules: {
-            include: { lessons: true },
+            include: {
+              lessons: {
+                include: {
+                  lessonProgresses: {
+                    where: { userId },
+                    select: { completedAt: true },
+                  },
+                },
+              },
+            },
           },
         },
       },
     },
-  });
+  }).then((enrollments) =>
+    enrollments.map((enrollment) => ({
+      ...enrollment,
+      course: enrollment.course
+        ? mapCourseWithProgress(enrollment.course)
+        : enrollment.course,
+    }))
+  );
 };
 
 export const getEnrollmentsForCourse = async (

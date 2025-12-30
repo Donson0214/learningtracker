@@ -8,6 +8,7 @@ import {
   updateOrganizationSchema,
 } from "../../validators/organization.schema";
 import { buildValidationError } from "../../utils/validation";
+import { notifyOrganizationUsers } from "../notifications/notification.service";
 
 export const createOrg = async (
   req: AuthenticatedRequest,
@@ -20,9 +21,14 @@ export const createOrg = async (
   const { name } = parsed.data;
 
   if (req.user?.organizationId) {
-    return res
-      .status(409)
-      .json({ message: "Organization already assigned" });
+    const existingOrg = await orgService.getOrganizationById(
+      req.user.organizationId
+    );
+    if (existingOrg?.isActive) {
+      return res
+        .status(409)
+        .json({ message: "Organization already assigned" });
+    }
   }
 
   const nextRole =
@@ -134,6 +140,15 @@ export const deactivateOrg = async (
     req.user!.organizationId!
   );
 
+  const notifiedUserIds = await notifyOrganizationUsers(
+    req.user!.organizationId!,
+    "Organization paused",
+    "Your organization has been paused by an administrator.",
+    {
+      excludeRoles: ["ORG_ADMIN", "SYSTEM_ADMIN"],
+    }
+  );
+
   const org = await orgService.getOrganizationById(
     req.user!.organizationId!
   );
@@ -145,7 +160,61 @@ export const deactivateOrg = async (
     });
   }
 
+  notifiedUserIds.forEach((userId) => {
+    broadcast({
+      type: "notifications.changed",
+      scope: { userId },
+    });
+  });
+
   res.json(org);
+};
+
+export const deleteOrg = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  if (!req.user?.organizationId) {
+    return res.status(404).json({ message: "No organization assigned" });
+  }
+
+  const organizationId = req.user.organizationId;
+
+  const notifiedUserIds = await notifyOrganizationUsers(
+    organizationId,
+    "Organization deleted",
+    "Your organization has been permanently deleted by an administrator.",
+    {
+      excludeRoles: ["ORG_ADMIN", "SYSTEM_ADMIN"],
+    }
+  );
+
+  const deleted = await orgService.deleteOrganization(organizationId);
+  if (!deleted) {
+    return res.status(404).json({ message: "Organization not found" });
+  }
+
+  broadcast({
+    type: "organizations.changed",
+    scope: { organizationId },
+  });
+  broadcast({
+    type: "users.changed",
+    scope: { organizationId },
+  });
+  broadcast({
+    type: "enrollments.changed",
+    scope: { organizationId },
+  });
+
+  notifiedUserIds.forEach((userId) => {
+    broadcast({
+      type: "notifications.changed",
+      scope: { userId },
+    });
+  });
+
+  res.json({ success: true });
 };
 
 export const activateOrg = async (

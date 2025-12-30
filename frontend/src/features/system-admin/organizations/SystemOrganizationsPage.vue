@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import {
   BuildingOffice2Icon,
   CheckCircleIcon,
+  TrashIcon,
   XCircleIcon,
 } from "@heroicons/vue/24/outline";
 import { useSystemOrganizationsStore } from "./store";
@@ -16,7 +17,10 @@ const organizations = computed(() => orgStore.organizations);
 const isLoading = computed(() => orgStore.isLoading);
 const errorMessage = computed(() => orgStore.errorMessage);
 const searchQuery = ref("");
-const actionLoading = ref<{ id: string; action: "activate" | "deactivate" } | null>(null);
+const actionLoading = ref<{
+  id: string;
+  action: "activate" | "deactivate" | "delete";
+} | null>(null);
 const confirmDialog = ref({
   open: false,
   title: "",
@@ -62,14 +66,16 @@ const isBusy = (id: string) => actionLoading.value?.id === id;
 
 const performAction = async (
   id: string,
-  action: "activate" | "deactivate"
+  action: "activate" | "deactivate" | "delete"
 ) => {
   actionLoading.value = { id, action };
   try {
     if (action === "activate") {
       await orgStore.activate(id);
-    } else {
+    } else if (action === "deactivate") {
       await orgStore.deactivate(id);
+    } else {
+      await orgStore.remove(id);
     }
   } finally {
     actionLoading.value = null;
@@ -119,6 +125,15 @@ const requestActivate = (id: string, name: string) => {
     message: `Reactivate ${name} and restore access for members?`,
     confirmLabel: "Reactivate",
     onConfirm: () => performAction(id, "activate"),
+  });
+};
+
+const requestDelete = (id: string, name: string) => {
+  openConfirm({
+    title: "Delete organization",
+    message: `Permanently delete ${name}? This cannot be undone.`,
+    confirmLabel: "Delete",
+    onConfirm: () => performAction(id, "delete"),
   });
 };
 </script>
@@ -199,7 +214,8 @@ const requestActivate = (id: string, name: string) => {
       v-else
       class="bg-white border border-gray-200 rounded-xl overflow-hidden"
     >
-      <table class="min-w-full text-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-[720px] w-full text-sm">
         <thead class="bg-gray-50 text-gray-600">
           <tr>
             <th class="text-left px-4 py-3 font-medium">Organization</th>
@@ -230,7 +246,9 @@ const requestActivate = (id: string, name: string) => {
             <td class="px-4 py-3">
               <span
                 class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-                :class="org.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'"
+                :class="org.isActive
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                  : 'bg-gray-200 text-gray-600 dark:bg-slate-700 dark:text-slate-200'"
               >
                 <CheckCircleIcon v-if="org.isActive" class="h-3 w-3" />
                 <XCircleIcon v-else class="h-3 w-3" />
@@ -254,6 +272,14 @@ const requestActivate = (id: string, name: string) => {
                 View
               </RouterLink>
               <button
+                class="inline-flex items-center gap-1 text-xs font-medium text-red-600 mr-3 hover:text-red-700 disabled:opacity-60"
+                :disabled="isBusy(org.id)"
+                @click="requestDelete(org.id, org.name)"
+              >
+                <TrashIcon class="h-3 w-3" />
+                Delete
+              </button>
+              <button
                 v-if="org.isActive"
                 class="border border-red-300 text-red-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 disabled:opacity-60"
                 :disabled="isBusy(org.id)"
@@ -272,7 +298,8 @@ const requestActivate = (id: string, name: string) => {
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
 
     <ConfirmDialog

@@ -39,3 +39,10 @@ export const activateOrganization = async () => {
   );
   return data;
 };
+
+export const deleteOrganization = async () => {
+  const { data } = await apiClient.delete<{ success: boolean }>(
+    "/organizations/permanent"
+  );
+  return data;
+};

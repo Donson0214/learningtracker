@@ -163,7 +163,7 @@ const enrollments = ref<Enrollment[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
 const hasOrganization = computed(
-  () => Boolean(auth.user?.organization)
+  () => Boolean(auth.user?.organization?.isActive)
 );
 
 const showGenerator = ref(false);

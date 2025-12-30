@@ -14,6 +14,7 @@ import StudySessionsPage from "@/features/study-sessions/pages/StudySessionsPage
 import NotificationsPage from "@/features/notifications/pages/NotificationsPage.vue";
 import ProfileGoalsPage from "@/features/profile/pages/ProfileGoalsPage.vue";
 import InviteAcceptPage from "@/features/invites/pages/InviteAcceptPage.vue";
+import LandingPage from "@/features/marketing/pages/LandingPage.vue";
 
 /* ======================
    ADMIN LAYOUT + PAGES
@@ -33,6 +34,7 @@ const routes = [
   { path: "/login", component: LoginPage, meta: { public: true } },
   { path: "/register", component: RegisterPage, meta: { public: true } },
   { path: "/invite", component: InviteAcceptPage, meta: { public: true } },
+  { path: "/", component: LandingPage, meta: { public: true } },
 
   /* ---------- Learner (UNCHANGED) ---------- */
   {
@@ -103,6 +105,11 @@ router.beforeEach(async (to) => {
 
   if (to.meta.public) {
     if (auth.isAuthenticated && (to.path === "/login" || to.path === "/register")) {
+      const isAdmin =
+        auth.user?.role === "ORG_ADMIN" || auth.user?.role === "SYSTEM_ADMIN";
+      return { path: isAdmin ? "/admin" : "/dashboard" };
+    }
+    if (auth.isAuthenticated && to.path === "/") {
       const isAdmin =
         auth.user?.role === "ORG_ADMIN" || auth.user?.role === "SYSTEM_ADMIN";
       return { path: isAdmin ? "/admin" : "/dashboard" };

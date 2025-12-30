@@ -165,3 +165,57 @@ export const removeOrganizationMember = async (
     return { status: "removed" as const, user: updated };
   });
 };
+
+export const deleteOrganization = async (organizationId: string) => {
+  return prisma.$transaction(async (tx) => {
+    const org = await tx.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true },
+    });
+
+    if (!org) {
+      return null;
+    }
+
+    await tx.studyPlanItem.deleteMany({
+      where: { course: { organizationId } },
+    });
+    await tx.studySession.deleteMany({
+      where: { course: { organizationId } },
+    });
+    await tx.enrollment.deleteMany({
+      where: { course: { organizationId } },
+    });
+    await tx.lesson.deleteMany({
+      where: { module: { course: { organizationId } } },
+    });
+    await tx.module.deleteMany({
+      where: { course: { organizationId } },
+    });
+    await tx.course.deleteMany({
+      where: { organizationId },
+    });
+    await tx.organizationInvite.deleteMany({
+      where: { organizationId },
+    });
+    await tx.user.updateMany({
+      where: {
+        organizationId,
+        role: { not: "SYSTEM_ADMIN" },
+      },
+      data: { organizationId: null, role: "LEARNER" },
+    });
+    await tx.user.updateMany({
+      where: {
+        organizationId,
+        role: "SYSTEM_ADMIN",
+      },
+      data: { organizationId: null },
+    });
+    await tx.organization.delete({
+      where: { id: organizationId },
+    });
+
+    return org;
+  });
+};

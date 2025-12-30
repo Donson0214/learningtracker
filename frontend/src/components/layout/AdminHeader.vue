@@ -5,6 +5,7 @@ import {
   BellIcon,
   UserIcon,
   ChevronDownIcon,
+  Bars3Icon,
   MoonIcon,
   SunIcon,
   ArrowLeftIcon,
@@ -29,6 +30,9 @@ const isNotificationsLoading = ref(false);
 const notificationsError = ref("");
 let pollTimer: number | null = null;
 const { theme, toggleTheme } = useTheme();
+const emit = defineEmits<{
+  (event: "toggle-sidebar"): void;
+}>();
 
 const title = computed(() => {
   const map: Record<string, string> = {
@@ -162,33 +166,43 @@ onBeforeUnmount(() => {
 const handleLogout = async () => {
   await auth.signOut();
   closeMenu();
-  router.push("/login");
+  router.push("/");
 };
 </script>
 
 <template>
   <header
     class="h-16 bg-white border-b border-gray-200
-           flex items-center justify-between
-           px-6 dark:bg-slate-900 dark:border-slate-800"
+           flex items-center justify-between gap-3
+           px-4 sm:px-6 dark:bg-slate-900 dark:border-slate-800"
   >
     <!-- Page Title -->
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <button
+        type="button"
+        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900
+               dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 md:hidden"
+        aria-label="Open navigation"
+        @click="emit('toggle-sidebar')"
+      >
+        <Bars3Icon class="h-5 w-5" />
+      </button>
       <RouterLink
+        v-if="auth.user?.role !== 'SYSTEM_ADMIN'"
         to="/dashboard"
         class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900
                dark:text-slate-300 dark:hover:text-slate-100"
       >
         <ArrowLeftIcon class="h-4 w-4" />
-        <span class="hidden sm:inline">Back to App</span>
+        <span class="hidden sm:inline">Back</span>
       </RouterLink>
-      <h1 class="text-lg font-semibold text-gray-900 dark:text-slate-100">
+      <h1 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">
         {{ title }}
       </h1>
     </div>
 
     <!-- Right Actions -->
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-2 sm:gap-4">
       <!-- Notifications -->
       <div ref="notificationsRef" class="relative">
         <button
@@ -211,8 +225,8 @@ const handleLogout = async () => {
 
         <div
           v-if="notificationsOpen"
-          class="absolute right-0 mt-2 w-80 rounded-lg border border-gray-200
-                 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          class="absolute right-0 mt-2 w-72 max-w-[90vw] rounded-lg border border-gray-200
+                 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900 sm:w-80"
         >
           <div
             class="flex items-center justify-between px-4 py-3 border-b border-gray-200

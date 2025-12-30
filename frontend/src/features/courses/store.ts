@@ -42,6 +42,34 @@ export const useCoursesStore = defineStore("courses", () => {
     return course;
   };
 
+  const setLessonCompletion = (
+    lessonId: string,
+    isCompleted: boolean,
+    completedAt: string | null
+  ) => {
+    const applyToCourse = (course: Course) => {
+      course.modules?.forEach((module) => {
+        module.lessons?.forEach((lesson) => {
+          if (lesson.id !== lessonId) {
+            return;
+          }
+          lesson.isCompleted = isCompleted;
+          lesson.completedAt = completedAt;
+        });
+      });
+    };
+
+    enrollments.value.forEach((enrollment) => {
+      if (enrollment.course) {
+        applyToCourse(enrollment.course);
+      }
+    });
+
+    Object.values(coursesById.value).forEach((course) => {
+      applyToCourse(course);
+    });
+  };
+
   const clear = () => {
     enrollments.value = [];
     coursesById.value = {};
@@ -57,6 +85,7 @@ export const useCoursesStore = defineStore("courses", () => {
     initialized,
     loadEnrollments,
     getCourse,
+    setLessonCompletion,
     clear,
   };
 });

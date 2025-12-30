@@ -1,5 +1,15 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { BuildingOffice2Icon } from "@heroicons/vue/24/outline";
+import { useAuthStore } from "@/features/auth/store";
+
+const auth = useAuthStore();
+const isOrgInactive = computed(
+  () =>
+    Boolean(
+      auth.user?.organization && !auth.user.organization.isActive
+    )
+);
 </script>
 
 <template>
@@ -13,11 +23,16 @@ import { BuildingOffice2Icon } from "@heroicons/vue/24/outline";
       </div>
       <div class="flex-1">
         <h3 class="text-base font-semibold text-gray-900">
-          No organization yet
+          {{ isOrgInactive ? "Organization paused" : "No organization yet" }}
         </h3>
         <p class="text-sm text-gray-600 mt-1">
-          Join an organization to access courses, study plans, and notifications.
-          Ask your admin for an invite or create your own organization.
+          <span v-if="isOrgInactive">
+            Your organization has been paused by an administrator. You can create a new organization or ask an admin to reactivate it.
+          </span>
+          <span v-else>
+            Join an organization to access courses, study plans, and notifications.
+            Ask your admin for an invite or create your own organization.
+          </span>
         </p>
         <div class="mt-4 flex flex-wrap gap-2">
           <RouterLink
@@ -32,7 +47,7 @@ import { BuildingOffice2Icon } from "@heroicons/vue/24/outline";
             class="inline-flex items-center justify-center rounded-lg bg-gray-900
                    px-3 py-2 text-xs font-medium text-white hover:bg-gray-800"
           >
-            Create organization
+            {{ isOrgInactive ? "Create new organization" : "Create organization" }}
           </RouterLink>
         </div>
       </div>

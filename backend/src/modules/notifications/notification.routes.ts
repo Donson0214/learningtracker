@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth";
-import { requireActiveOrganization } from "../../middlewares/requireActiveOrganization";
 import {
   myNotifications,
   markRead,
@@ -10,7 +9,6 @@ import { saveDeviceTokenHandler } from "./notification.token.controller";
 
 const router = Router();
 router.use(requireAuth);
-router.use(requireActiveOrganization);
 
 // list notifications
 router.get("/me", myNotifications);

@@ -21,6 +21,8 @@ import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import { useAdminAnalyticsStore } from "./store";
 import StateMessage from "@/components/ui/StateMessage.vue";
+import NoOrganizationState from "@/components/ui/NoOrganizationState.vue";
+import { useAuthStore } from "@/features/auth/store";
 
 Chart.register(
   LineController,
@@ -43,12 +45,20 @@ const paceCanvas = ref<HTMLCanvasElement | null>(null);
 const charts: Chart[] = [];
 
 const analyticsStore = useAdminAnalyticsStore();
+const auth = useAuthStore();
 const analytics = computed(() => analyticsStore.analytics);
 const isLoading = computed(() => analyticsStore.isLoading);
 const errorMessage = computed(() => analyticsStore.errorMessage);
 const { theme } = useTheme();
+const hasActiveOrganization = computed(
+  () => Boolean(auth.user?.organization?.isActive)
+);
 
 const loadAnalytics = async () => {
+  if (!hasActiveOrganization.value) {
+    analyticsStore.clear();
+    return;
+  }
   await analyticsStore.loadAnalytics();
 };
 
@@ -265,13 +275,19 @@ const topLearners = computed(() => analytics.value?.topLearners ?? []);
     </div>
 
     <StateMessage
-      v-if="errorMessage"
+      v-if="errorMessage && hasActiveOrganization"
       class="mb-4"
       variant="error"
       title="Something went wrong"
       :message="errorMessage"
     />
 
+    <NoOrganizationState
+      v-if="!hasActiveOrganization"
+      class="mb-6"
+    />
+
+    <template v-else>
     <!-- KPI Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <div class="bg-white border border-gray-200 rounded-xl p-6">
@@ -405,5 +421,6 @@ const topLearners = computed(() => analytics.value?.topLearners ?? []);
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>

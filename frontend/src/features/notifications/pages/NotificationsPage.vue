@@ -77,9 +77,14 @@
             <div
               class="w-10 h-5 bg-gray-200 rounded-full peer
                      peer-checked:bg-gray-900
+                     dark:bg-slate-700 dark:peer-checked:bg-slate-200
+                     ring-1 ring-slate-200/70 dark:ring-slate-600/70
                      after:content-['']
                      after:absolute after:top-0.5 after:left-[2px]
                      after:bg-white after:h-4 after:w-4
+                     dark:after:bg-slate-200
+                     peer-checked:after:bg-white
+                     dark:peer-checked:after:bg-slate-900
                      after:rounded-full after:transition-all
                      peer-checked:after:translate-x-full"
             ></div>
@@ -242,16 +247,11 @@ const dailyReminderEnabled = ref(
 );
 const inviteActionId = ref<string | null>(null);
 const hasOrganization = computed(
-  () => Boolean(auth.user?.organization)
+  () => Boolean(auth.user?.organization?.isActive)
 );
 
 const loadNotifications = async () => {
   errorMessage.value = "";
-  if (!hasOrganization.value) {
-    notifications.value = [];
-    isLoading.value = false;
-    return;
-  }
   isLoading.value = true;
   try {
     notifications.value = await fetchNotifications();

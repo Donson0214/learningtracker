@@ -18,11 +18,15 @@ export const requireActiveOrganization = async (
     });
 
     if (!org) {
-      return res.status(404).json({ message: "Organization not found" });
+      return res
+        .status(404)
+        .json({ message: "Organization not found", code: "ORG_NOT_FOUND" });
     }
 
     if (!org.isActive) {
-      return res.status(403).json({ message: "Organization is inactive" });
+      return res
+        .status(403)
+        .json({ message: "Organization is inactive", code: "ORG_INACTIVE" });
     }
 
     return next();

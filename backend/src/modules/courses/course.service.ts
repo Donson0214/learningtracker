@@ -1,5 +1,24 @@
 import { prisma } from "../../prisma";
 
+const mapLessonsWithProgress = <T extends { lessonProgresses?: { completedAt: Date }[] }>(
+  lessons: T[]
+) =>
+  lessons.map(({ lessonProgresses, ...lesson }) => ({
+    ...lesson,
+    isCompleted: Boolean(lessonProgresses?.length),
+    completedAt: lessonProgresses?.[0]?.completedAt ?? null,
+  }));
+
+const mapCourseWithProgress = <T extends { modules?: Array<{ lessons?: { lessonProgresses?: { completedAt: Date }[] }[] }> }>(
+  course: T
+) => ({
+  ...course,
+  modules: course.modules?.map((module) => ({
+    ...module,
+    lessons: module.lessons ? mapLessonsWithProgress(module.lessons) : [],
+  })),
+});
+
 export const createCourse = async (
   organizationId: string,
   data: {
@@ -87,7 +106,16 @@ export const getCoursesForLearnerPaged = async (
             ...(includeModules
               ? {
                   modules: {
-                    include: { lessons: true },
+                    include: {
+                      lessons: {
+                        include: {
+                          lessonProgresses: {
+                            where: { userId },
+                            select: { completedAt: true },
+                          },
+                        },
+                      },
+                    },
                   },
                 }
               : {}),
@@ -103,8 +131,10 @@ export const getCoursesForLearnerPaged = async (
 
   const items = enrollments.map((enrollment) => {
     const { _count, ...course } = enrollment.course;
+    const mappedCourse =
+      includeModules ? mapCourseWithProgress(course) : course;
     return {
-      ...course,
+      ...mappedCourse,
       modulesCount: _count.modules,
     };
   });
@@ -136,14 +166,27 @@ export const getCourseForLearnerById = async (
       course: {
         include: {
           modules: {
-            include: { lessons: true },
+            include: {
+              lessons: {
+                include: {
+                  lessonProgresses: {
+                    where: { userId },
+                    select: { completedAt: true },
+                  },
+                },
+              },
+            },
           },
         },
       },
     },
   });
 
-  return enrollment?.course ?? null;
+  if (!enrollment?.course) {
+    return null;
+  }
+
+  return mapCourseWithProgress(enrollment.course);
 };
 
 export const updateCourse = async (

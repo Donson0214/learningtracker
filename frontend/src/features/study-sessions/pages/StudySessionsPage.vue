@@ -54,7 +54,8 @@
         </div>
       </div>
 
-      <table class="w-full text-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-[720px] w-full text-sm">
         <thead class="bg-gray-50 text-gray-500 text-xs">
           <tr>
             <th class="text-left px-4 py-3">Date</th>
@@ -111,7 +112,8 @@
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
 
     <Modal :open="showModal" :title="modalTitle" @close="closeModal">
@@ -242,7 +244,7 @@ const isLoading = ref(true);
 const errorMessage = ref("");
 const selectedCourseId = ref("");
 const hasOrganization = computed(
-  () => Boolean(auth.user?.organization)
+  () => Boolean(auth.user?.organization?.isActive)
 );
 
 const showModal = ref(false);

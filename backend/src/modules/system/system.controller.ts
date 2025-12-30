@@ -3,6 +3,8 @@ import { AuthenticatedRequest } from "../../middlewares/requireAuth";
 import { buildPaginationResponse, parsePagination } from "../../utils/pagination";
 import { broadcast } from "../../realtime/realtime";
 import * as systemService from "./system.service";
+import * as orgService from "../organizations/organization.service";
+import { notifyOrganizationUsers } from "../notifications/notification.service";
 
 export const listOrganizations = async (
   req: AuthenticatedRequest,
@@ -146,6 +148,15 @@ export const deactivateOrganization = async (
     return res.status(404).json({ message: "Organization not found" });
   }
 
+  const notifiedUserIds = await notifyOrganizationUsers(
+    updated.id,
+    "Organization paused",
+    "Your organization has been paused by an administrator.",
+    {
+      excludeRoles: ["ORG_ADMIN", "SYSTEM_ADMIN"],
+    }
+  );
+
   broadcast({
     type: "organizations.changed",
     scope: { organizationId: updated.id },
@@ -153,7 +164,60 @@ export const deactivateOrganization = async (
   broadcast({ type: "system.organizations.changed" });
   broadcast({ type: "system.analytics.changed" });
 
+  notifiedUserIds.forEach((userId) => {
+    broadcast({
+      type: "notifications.changed",
+      scope: { userId },
+    });
+  });
+
   res.json(updated);
+};
+
+export const deleteOrganization = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  const organizationId = req.params.id;
+
+  const notifiedUserIds = await notifyOrganizationUsers(
+    organizationId,
+    "Organization deleted",
+    "Your organization has been permanently deleted by a system administrator.",
+    {
+      excludeRoles: ["ORG_ADMIN", "SYSTEM_ADMIN"],
+    }
+  );
+
+  const deleted = await orgService.deleteOrganization(organizationId);
+
+  if (!deleted) {
+    return res.status(404).json({ message: "Organization not found" });
+  }
+
+  broadcast({
+    type: "organizations.changed",
+    scope: { organizationId },
+  });
+  broadcast({ type: "system.organizations.changed" });
+  broadcast({ type: "system.analytics.changed" });
+  broadcast({
+    type: "users.changed",
+    scope: { organizationId },
+  });
+  broadcast({
+    type: "enrollments.changed",
+    scope: { organizationId },
+  });
+
+  notifiedUserIds.forEach((userId) => {
+    broadcast({
+      type: "notifications.changed",
+      scope: { userId },
+    });
+  });
+
+  res.json({ success: true });
 };
 
 export const getSystemAnalytics = async (

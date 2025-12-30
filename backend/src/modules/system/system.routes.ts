@@ -10,6 +10,7 @@ import {
   listCourses,
   activateOrganization,
   deactivateOrganization,
+  deleteOrganization,
   getSystemAnalytics,
 } from "./system.controller";
 
@@ -24,6 +25,7 @@ router.get("/organizations/:id/members", listOrganizationMembers);
 router.get("/organizations/:id/courses", listOrganizationCourses);
 router.patch("/organizations/:id/activate", activateOrganization);
 router.patch("/organizations/:id/deactivate", deactivateOrganization);
+router.delete("/organizations/:id", deleteOrganization);
 router.get("/members", listMembers);
 router.get("/courses", listCourses);
 router.get("/analytics", getSystemAnalytics);

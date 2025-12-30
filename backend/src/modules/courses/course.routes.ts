@@ -24,6 +24,10 @@ import {
   updateLesson,
   deleteLesson,
 } from "./lesson.controller";
+import {
+  completeLesson,
+  clearLessonCompletion,
+} from "./lessonProgress.controller";
 
 const router = Router();
 
@@ -92,6 +96,19 @@ router.delete(
   "/lessons/:lessonId",
   requireRole(["ORG_ADMIN"]),
   deleteLesson
+);
+
+// LESSON PROGRESS
+router.post(
+  "/lessons/:lessonId/complete",
+  requireRole(["LEARNER", "ORG_ADMIN", "SYSTEM_ADMIN"]),
+  completeLesson
+);
+
+router.delete(
+  "/lessons/:lessonId/complete",
+  requireRole(["LEARNER", "ORG_ADMIN", "SYSTEM_ADMIN"]),
+  clearLessonCompletion
 );
 
 export default router;

@@ -147,6 +147,7 @@ export const acceptInviteById = async (payload: {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
+    include: { organization: { select: { isActive: true } } },
   });
 
   if (!user) {
@@ -159,7 +160,8 @@ export const acceptInviteById = async (payload: {
 
   if (
     user.organizationId &&
-    user.organizationId !== invite.organizationId
+    user.organizationId !== invite.organizationId &&
+    user.organization?.isActive
   ) {
     return { status: "ORG_CONFLICT" as const };
   }
@@ -222,6 +224,7 @@ export const acceptInvite = async (payload: {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
+    include: { organization: { select: { isActive: true } } },
   });
 
   if (!user) {
@@ -230,7 +233,8 @@ export const acceptInvite = async (payload: {
 
   if (
     user.organizationId &&
-    user.organizationId !== invite.organizationId
+    user.organizationId !== invite.organizationId &&
+    user.organization?.isActive
   ) {
     return { status: "ORG_CONFLICT" as const };
   }

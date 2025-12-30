@@ -147,7 +147,7 @@
     </div>
 
     <div
-      v-if="!auth.user?.organization"
+      v-if="canCreateOrg"
       class="mt-6 bg-white border border-gray-200 rounded-xl p-6"
     >
       <div class="mb-4">
@@ -210,6 +210,30 @@ const isCreatingOrg = ref(false);
 const orgErrorMessage = ref("");
 const orgSuccessMessage = ref("");
 
+const getOrgErrorMessage = (error: unknown) => {
+  if (
+    error &&
+    typeof error === "object" &&
+    "response" in error
+  ) {
+    const data = (error as {
+      response?: {
+        data?: { message?: string; details?: Record<string, string[]> };
+      };
+    }).response?.data;
+    if (data?.details?.name?.length) {
+      return data.details.name[0];
+    }
+    if (data?.message) {
+      return data.message;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Unable to create organization.";
+};
+
 const loadGoal = async () => {
   errorMessage.value = "";
   try {
@@ -233,6 +257,11 @@ const roleLabel = computed(() => {
   if (auth.user.role === "SYSTEM_ADMIN") return "System Admin";
   return "Learner";
 });
+
+const canCreateOrg = computed(
+  () =>
+    !auth.user?.organization || !auth.user.organization.isActive
+);
 
 const saveGoal = async () => {
   errorMessage.value = "";
@@ -278,7 +307,16 @@ const createOrg = async () => {
       "Organization created. You are now an admin.";
     orgName.value = "";
   } catch (error) {
-    orgErrorMessage.value = "Unable to create organization.";
+    const message = getOrgErrorMessage(error);
+    if (message === "Organization already assigned") {
+      await auth.refreshProfile();
+      orgSuccessMessage.value =
+        "You are already assigned to an organization.";
+      orgName.value = "";
+      orgErrorMessage.value = "";
+    } else {
+      orgErrorMessage.value = message;
+    }
   } finally {
     isCreatingOrg.value = false;
   }

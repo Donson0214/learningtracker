@@ -4,6 +4,7 @@ import type { Organization } from "@/shared/types";
 import {
   activateOrganization,
   deactivateOrganization,
+  deleteOrganization,
   fetchOrganization,
   updateOrganization,
 } from "./api";
@@ -72,6 +73,17 @@ export const useAdminOrganizationStore = defineStore(
       }
     };
 
+    const removeOrganization = async () => {
+      clearError();
+      try {
+        await deleteOrganization();
+        organization.value = null;
+      } catch (error) {
+        errorMessage.value = "Unable to delete organization.";
+        throw error;
+      }
+    };
+
     const clear = () => {
       organization.value = null;
       isLoading.value = false;
@@ -86,6 +98,7 @@ export const useAdminOrganizationStore = defineStore(
       updateOrganizationName,
       deactivate,
       activate,
+      removeOrganization,
       clearError,
       clear,
     };

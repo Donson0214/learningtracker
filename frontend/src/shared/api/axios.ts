@@ -7,9 +7,13 @@ export const apiClient = axios.create({
 });
 
 type RefreshHandler = () => Promise<string | null>;
+type OrgInactiveHandler = () => void;
+type OrgMissingHandler = () => void;
 
 let refreshHandler: RefreshHandler | null = null;
 let refreshPromise: Promise<string | null> | null = null;
+let orgInactiveHandler: OrgInactiveHandler | null = null;
+let orgMissingHandler: OrgMissingHandler | null = null;
 
 export const setAuthToken = (token: string | null) => {
   if (token) {
@@ -23,11 +27,42 @@ export const setAuthRefreshHandler = (handler: RefreshHandler | null) => {
   refreshHandler = handler;
 };
 
+export const setOrgInactiveHandler = (
+  handler: OrgInactiveHandler | null
+) => {
+  orgInactiveHandler = handler;
+};
+
+export const setOrgMissingHandler = (
+  handler: OrgMissingHandler | null
+) => {
+  orgMissingHandler = handler;
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const config = error?.config;
-    if (!config || error?.response?.status !== 401 || !refreshHandler) {
+    const status = error?.response?.status;
+    const code = error?.response?.data?.code;
+
+    if (
+      status === 403 &&
+      code === "ORG_INACTIVE" &&
+      orgInactiveHandler
+    ) {
+      orgInactiveHandler();
+    }
+
+    if (
+      status === 404 &&
+      code === "ORG_NOT_FOUND" &&
+      orgMissingHandler
+    ) {
+      orgMissingHandler();
+    }
+
+    if (!config || status !== 401 || !refreshHandler) {
       return Promise.reject(error);
     }
 

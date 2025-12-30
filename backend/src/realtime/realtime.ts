@@ -30,6 +30,9 @@ type RealtimeClient = {
 
 const clients = new Set<RealtimeClient>();
 
+const shouldCheckRevoked = () =>
+  process.env.FIREBASE_CHECK_REVOKED === "true";
+
 const parseTokenFromRequest = (req: IncomingMessage) => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
@@ -47,7 +50,9 @@ const parseTokenFromRequest = (req: IncomingMessage) => {
 };
 
 const ensureUserFromToken = async (token: string) => {
-  const decoded = await firebaseAdmin.auth().verifyIdToken(token, true);
+  const decoded = await firebaseAdmin
+    .auth()
+    .verifyIdToken(token, shouldCheckRevoked());
 
   let user = await prisma.user.findUnique({
     where: { firebaseUid: decoded.uid },

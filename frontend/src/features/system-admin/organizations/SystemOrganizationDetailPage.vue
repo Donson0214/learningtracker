@@ -10,9 +10,13 @@ import {
 import TableStateRow from "@/components/ui/TableStateRow.vue";
 import PaginationControls from "@/components/ui/PaginationControls.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { useAutoRefresh } from "@/shared/composables/useAutoRefresh";
 import type { SystemCourse, SystemMember, SystemOrganization } from "@/shared/types";
 import {
+  activateSystemOrganization,
+  deactivateSystemOrganization,
+  deleteSystemOrganization,
   fetchSystemOrganization,
   fetchSystemOrganizationMembers,
   fetchSystemOrganizationCourses,
@@ -38,6 +42,14 @@ const coursesTotalPages = ref(1);
 const includeModules = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref("");
+const actionLoading = ref<"activate" | "deactivate" | "delete" | null>(null);
+const confirmDialog = ref({
+  open: false,
+  title: "",
+  message: "",
+  confirmLabel: "",
+  onConfirm: null as null | (() => Promise<void>),
+});
 
 const loadOrganization = async () => {
   organization.value = await fetchSystemOrganization(
@@ -106,6 +118,100 @@ const lessonCountFor = (courseModules?: { lessonsCount: number }[]) => {
   return courseModules.reduce((sum, module) => sum + module.lessonsCount, 0);
 };
 
+const openConfirm = (payload: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => Promise<void>;
+}) => {
+  confirmDialog.value = {
+    open: true,
+    title: payload.title,
+    message: payload.message,
+    confirmLabel: payload.confirmLabel,
+    onConfirm: payload.onConfirm,
+  };
+};
+
+const closeConfirm = () => {
+  confirmDialog.value.open = false;
+  confirmDialog.value.onConfirm = null;
+};
+
+const handleConfirm = async () => {
+  if (!confirmDialog.value.onConfirm) {
+    return;
+  }
+  await confirmDialog.value.onConfirm();
+  closeConfirm();
+};
+
+const performAction = async (
+  action: "activate" | "deactivate" | "delete"
+) => {
+  if (!organization.value) {
+    return;
+  }
+  actionLoading.value = action;
+  errorMessage.value = "";
+  try {
+    if (action === "activate") {
+      organization.value = await activateSystemOrganization(
+        organizationId.value
+      );
+    } else if (action === "deactivate") {
+      organization.value = await deactivateSystemOrganization(
+        organizationId.value
+      );
+    } else {
+      await deleteSystemOrganization(organizationId.value);
+      await router.push("/admin/organizations");
+    }
+  } catch (error) {
+    errorMessage.value =
+      action === "delete"
+        ? "Unable to delete organization."
+        : "Unable to update organization status.";
+  } finally {
+    actionLoading.value = null;
+  }
+};
+
+const requestDeactivate = () => {
+  if (!organization.value?.isActive) {
+    return;
+  }
+  openConfirm({
+    title: "Deactivate organization",
+    message:
+      "Pause this organization and suspend access for all members?",
+    confirmLabel: "Deactivate",
+    onConfirm: () => performAction("deactivate"),
+  });
+};
+
+const requestActivate = () => {
+  if (organization.value?.isActive) {
+    return;
+  }
+  openConfirm({
+    title: "Reactivate organization",
+    message: "Reactivate this organization and restore access?",
+    confirmLabel: "Reactivate",
+    onConfirm: () => performAction("activate"),
+  });
+};
+
+const requestDelete = () => {
+  openConfirm({
+    title: "Delete organization",
+    message:
+      "Permanently delete this organization and remove all member access? This cannot be undone.",
+    confirmLabel: "Delete",
+    onConfirm: () => performAction("delete"),
+  });
+};
+
 const goBack = () => {
   router.push("/admin/organizations");
 };
@@ -129,10 +235,37 @@ const goBack = () => {
           System view of organization details
         </p>
       </div>
-      <div
-        class="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center"
-      >
-        <BuildingOffice2Icon class="h-6 w-6" />
+      <div class="flex items-center gap-3">
+        <div v-if="organization" class="flex items-center gap-2">
+          <button
+            v-if="organization.isActive"
+            class="border border-red-300 text-red-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-red-50 disabled:opacity-60"
+            :disabled="actionLoading === 'deactivate'"
+            @click="requestDeactivate"
+          >
+            {{ actionLoading === "deactivate" ? "Working..." : "Deactivate" }}
+          </button>
+          <button
+            v-else
+            class="border border-emerald-300 text-emerald-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-emerald-50 disabled:opacity-60"
+            :disabled="actionLoading === 'activate'"
+            @click="requestActivate"
+          >
+            {{ actionLoading === "activate" ? "Working..." : "Activate" }}
+          </button>
+          <button
+            class="bg-red-600 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-60"
+            :disabled="actionLoading === 'delete'"
+            @click="requestDelete"
+          >
+            {{ actionLoading === "delete" ? "Deleting..." : "Delete" }}
+          </button>
+        </div>
+        <div
+          class="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center"
+        >
+          <BuildingOffice2Icon class="h-6 w-6" />
+        </div>
       </div>
     </div>
 
@@ -180,7 +313,8 @@ const goBack = () => {
             <p class="text-sm text-gray-500">All users in this organization</p>
           </div>
         </div>
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-[640px] w-full text-sm">
           <thead class="bg-gray-50 text-gray-500">
             <tr>
               <th class="text-left px-4 py-3">Name</th>
@@ -226,7 +360,8 @@ const goBack = () => {
               </td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
         <PaginationControls
           :page="membersPage"
           :page-size="membersPageSize"
@@ -258,7 +393,8 @@ const goBack = () => {
             Show modules
           </label>
         </div>
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-[640px] w-full text-sm">
           <thead class="bg-gray-50 text-gray-500">
             <tr>
               <th class="text-left px-4 py-3">Course</th>
@@ -310,7 +446,8 @@ const goBack = () => {
               </td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
         <PaginationControls
           :page="coursesPage"
           :page-size="coursesPageSize"
@@ -322,5 +459,15 @@ const goBack = () => {
         />
       </div>
     </div>
+
+    <ConfirmDialog
+      :open="confirmDialog.open"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-label="confirmDialog.confirmLabel"
+      :confirming="Boolean(actionLoading)"
+      @close="closeConfirm"
+      @confirm="handleConfirm"
+    />
   </div>
 </template>

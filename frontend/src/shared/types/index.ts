@@ -122,6 +122,8 @@ export type Lesson = {
   moduleId: string;
   title: string;
   estimatedMinutes: number;
+  isCompleted?: boolean;
+  completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

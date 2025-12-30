@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import {
   UsersIcon,
   BookOpenIcon,
@@ -11,9 +12,12 @@ import { useAdminCoursesStore } from "@/features/admin/courses/store";
 import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import StateMessage from "@/components/ui/StateMessage.vue";
+import { useAuthStore } from "@/features/auth/store";
 
 const orgStore = useAdminOrganizationStore();
 const coursesStore = useAdminCoursesStore();
+const auth = useAuthStore();
+const router = useRouter();
 const organization = computed(() => orgStore.organization);
 const totalCourses = computed(() => coursesStore.total);
 const isLoading = computed(() => orgStore.isLoading);
@@ -22,27 +26,41 @@ const isActive = ref(true);
 const isSaving = ref(false);
 const isDeactivating = ref(false);
 const isActivating = ref(false);
-const errorMessage = computed(
-  () => orgStore.errorMessage || coursesStore.errorMessage
-);
-const confirmDialog = ref({
-  open: false,
-  title: "",
-  message: "",
-  confirmLabel: "Deactivate",
-  onConfirm: null as null | (() => Promise<void>),
+const isDeleting = ref(false);
+const hasActiveOrganization = computed(() => {
+  if (organization.value) {
+    return organization.value.isActive;
+  }
+  return Boolean(auth.user?.organization?.isActive);
 });
+const errorMessage = computed(() =>
+  hasActiveOrganization.value
+    ? orgStore.errorMessage || coursesStore.errorMessage
+    : orgStore.errorMessage
+);
+  const confirmDialog = ref({
+    open: false,
+    title: "",
+    message: "",
+    confirmLabel: "Confirm",
+    onConfirm: null as null | (() => Promise<void>),
+  });
+const confirmDialogBusy = computed(
+  () => isSaving.value || isDeactivating.value || isActivating.value || isDeleting.value
+);
 
 const loadData = async (force = false) => {
   try {
-    await Promise.all([
-      orgStore.loadOrganization(),
-      coursesStore.loadCourses({
+    await orgStore.loadOrganization();
+    if (organization.value?.isActive) {
+      await coursesStore.loadCourses({
         silent: true,
         includeModules: false,
         force,
-      }),
-    ]);
+      });
+    } else {
+      coursesStore.clear();
+    }
     if (organization.value) {
       nameInput.value = organization.value.name;
       isActive.value = organization.value.isActive;
@@ -57,6 +75,13 @@ onMounted(loadData);
 const hasUnsavedChanges = computed(
   () => Boolean(organization.value) && nameInput.value.trim() !== (organization.value?.name ?? "")
 );
+const canSave = computed(() => {
+  const nextName = nameInput.value.trim();
+  if (!organization.value || !nextName) {
+    return false;
+  }
+  return nextName !== (organization.value?.name ?? "");
+});
 
 useRealtimeRefresh(
   ["organizations.changed", "courses.changed", "enrollments.changed"],
@@ -74,19 +99,30 @@ useRealtimeRefresh(
 );
 
 const saveChanges = async () => {
-  if (!nameInput.value.trim()) {
+  const nextName = nameInput.value.trim();
+  if (!nextName) {
     orgStore.clearError();
     orgStore.errorMessage = "Organization name is required.";
     return;
   }
+  if (!canSave.value) {
+    return;
+  }
   isSaving.value = true;
   try {
-    await orgStore.updateOrganizationName(nameInput.value.trim());
+    await orgStore.updateOrganizationName(nextName);
   } catch (error) {
     // Store already sets errorMessage.
   } finally {
     isSaving.value = false;
   }
+};
+
+const resetNameInput = () => {
+  if (organization.value) {
+    nameInput.value = organization.value.name;
+  }
+  orgStore.clearError();
 };
 
 const deactivate = async () => {
@@ -110,6 +146,20 @@ const activate = async () => {
     // Store already sets errorMessage.
   } finally {
     isActivating.value = false;
+  }
+};
+
+const deleteOrganization = async () => {
+  isDeleting.value = true;
+  try {
+    await orgStore.removeOrganization();
+    coursesStore.clear();
+    await auth.refreshProfile();
+    await router.push("/profile");
+  } catch (error) {
+    // Store already sets errorMessage.
+  } finally {
+    isDeleting.value = false;
   }
 };
 
@@ -146,10 +196,10 @@ const requestDeactivate = () => {
     return;
   }
   openConfirm({
-    title: "Deactivate organization",
+    title: "Pause organization",
     message:
-      "Deactivate this organization and disable access for all members? This action cannot be undone.",
-    confirmLabel: "Deactivate",
+      "Pause this organization and disable access for all members?",
+    confirmLabel: "Pause",
     onConfirm: deactivate,
   });
 };
@@ -159,11 +209,21 @@ const requestActivate = () => {
     return;
   }
   openConfirm({
-    title: "Reactivate organization",
+    title: "Activate organization",
     message:
-      "Reactivate this organization and restore access for all members?",
-    confirmLabel: "Reactivate",
+      "Activate this organization and restore access for all members?",
+    confirmLabel: "Activate",
     onConfirm: activate,
+  });
+};
+
+const requestDelete = () => {
+  openConfirm({
+    title: "Delete organization permanently",
+    message:
+      "This will permanently delete the organization, all courses, invites, and enrollments. Members will lose access immediately. This action cannot be undone.",
+    confirmLabel: "Delete permanently",
+    onConfirm: deleteOrganization,
   });
 };
 
@@ -206,8 +266,7 @@ const createdAtLabel = computed(() => {
       title="Loading organization"
       message="Fetching organization details."
     />
-
-    <div v-else>
+    <div>
       <!-- Stats -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <div class="bg-white border border-gray-200 rounded-xl p-6">
@@ -304,9 +363,11 @@ const createdAtLabel = computed(() => {
             <div class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm">
               <span
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="isActive ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-700'"
+                :class="isActive
+                  ? 'bg-gray-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                  : 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-200'"
               >
-                {{ isActive ? "Active" : "Inactive" }}
+                {{ isActive ? "Active" : "Paused" }}
               </span>
             </div>
           </div>
@@ -316,7 +377,7 @@ const createdAtLabel = computed(() => {
           <div>
             <p class="font-medium text-gray-900">Organization Status</p>
             <p class="text-sm text-gray-500">
-              Organization is currently {{ isActive ? "active" : "inactive" }}.
+              Organization is currently {{ isActive ? "active" : "paused" }}.
             </p>
           </div>
 
@@ -326,29 +387,24 @@ const createdAtLabel = computed(() => {
                 type="checkbox"
                 class="sr-only peer"
                 :checked="isActive"
-                :disabled="!isActive"
-                @click.prevent="requestDeactivate"
+                :disabled="isDeactivating || isActivating"
+                @click.prevent="isActive ? requestDeactivate() : requestActivate()"
               />
               <div
                 class="w-10 h-5 bg-gray-200 rounded-full peer
                        peer-checked:bg-gray-900
+                       dark:bg-slate-700 dark:peer-checked:bg-slate-200
+                       ring-1 ring-slate-200/70 dark:ring-slate-600/70
                        after:content-['']
                        after:absolute after:top-0.5 after:left-[2px]
                        after:bg-white after:h-4 after:w-4
+                       dark:after:bg-slate-200
+                       peer-checked:after:bg-white
+                       dark:peer-checked:after:bg-slate-900
                        after:rounded-full after:transition-all
                        peer-checked:after:translate-x-full"
               ></div>
             </label>
-            <button
-              v-if="!isActive"
-              class="bg-emerald-600 text-white
-                     px-3 py-1.5 rounded-lg
-                     text-xs font-medium hover:bg-emerald-700 disabled:opacity-70"
-              :disabled="isActivating"
-              @click="requestActivate"
-            >
-              {{ isActivating ? "Reactivating..." : "Reactivate" }}
-            </button>
           </div>
         </div>
 
@@ -357,7 +413,7 @@ const createdAtLabel = computed(() => {
             class="bg-gray-900 text-white
                    px-4 py-2 rounded-lg
                    text-sm font-medium hover:bg-gray-800 disabled:opacity-70"
-            :disabled="isSaving"
+            :disabled="isSaving || !canSave"
             @click="saveChanges"
           >
             {{ isSaving ? "Saving..." : "Save Changes" }}
@@ -365,8 +421,9 @@ const createdAtLabel = computed(() => {
           <button
             class="border border-gray-300 text-gray-700
                    px-4 py-2 rounded-lg
-                   text-sm font-medium hover:bg-gray-100"
-            @click="loadData"
+                   text-sm font-medium hover:bg-gray-100 disabled:opacity-70"
+            :disabled="isSaving || !hasUnsavedChanges"
+            @click="resetNameInput"
           >
             Cancel
           </button>
@@ -387,19 +444,19 @@ const createdAtLabel = computed(() => {
                  flex items-center justify-between"
         >
           <div>
-            <p class="font-medium text-gray-900">Deactivate Organization</p>
+            <p class="font-medium text-gray-900">Deactive Organization</p>
             <p class="text-sm text-gray-500">
-              Disable access for all members and pause the organization.
+              Permanently delete the organization and remove all members and data.
             </p>
           </div>
           <button
-            class="bg-red-600 text-white
+            class="bg-red-700 text-white
                    px-4 py-2 rounded-lg
-                   text-sm font-medium hover:bg-red-700 disabled:opacity-70"
-            :disabled="isDeactivating || !isActive"
-            @click="requestDeactivate"
+                   text-sm font-medium hover:bg-red-800 disabled:opacity-70"
+            :disabled="isDeleting || !organization"
+            @click="requestDelete"
           >
-            {{ isDeactivating ? "Deactivating..." : "Deactivate" }}
+            {{ isDeleting ? "Deleting..." : "Delete permanently" }}
           </button>
         </div>
       </div>
@@ -410,7 +467,7 @@ const createdAtLabel = computed(() => {
       :title="confirmDialog.title"
       :message="confirmDialog.message"
       :confirm-label="confirmDialog.confirmLabel"
-      :confirming="isDeactivating"
+      :confirming="confirmDialogBusy"
       @close="closeConfirm"
       @confirm="handleConfirm"
     />

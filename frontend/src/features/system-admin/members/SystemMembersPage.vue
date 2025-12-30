@@ -85,7 +85,8 @@ const roleLabel = (role: string) => {
     </div>
 
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <table class="w-full text-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-[720px] w-full text-sm">
         <thead class="bg-gray-50 text-gray-500">
           <tr>
             <th class="text-left px-4 py-3">Member</th>
@@ -130,8 +131,8 @@ const roleLabel = (role: string) => {
               <span
                 class="px-2 py-1 rounded-full text-xs font-medium"
                 :class="member.role === 'LEARNER'
-                  ? 'bg-gray-100 text-gray-700'
-                  : 'bg-gray-900 text-white'"
+                  ? 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-100'
+                  : 'bg-gray-900 text-white dark:bg-slate-200 dark:text-slate-900'"
               >
                 {{ roleLabel(member.role) }}
               </span>
@@ -148,8 +149,8 @@ const roleLabel = (role: string) => {
               <span
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                 :class="member.organization?.isActive
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-gray-200 text-gray-600'"
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                  : 'bg-gray-200 text-gray-600 dark:bg-slate-700 dark:text-slate-200'"
               >
                 {{ member.organization?.isActive ? "Active" : "Inactive" }}
               </span>
@@ -159,7 +160,8 @@ const roleLabel = (role: string) => {
             </td>
           </tr>
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <PaginationControls
         :page="page"

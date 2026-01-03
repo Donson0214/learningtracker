@@ -35,6 +35,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateGoal = exports.createGoal = exports.getMyGoal = void 0;
 const studyGoalService = __importStar(require("./studyGoal.service"));
+const realtime_1 = require("../../realtime/realtime");
+const studyGoal_schema_1 = require("../../validators/studyGoal.schema");
+const validation_1 = require("../../utils/validation");
 const getMyGoal = async (req, res) => {
     const goal = await studyGoalService.getLatestStudyGoal(req.user.id);
     if (!goal) {
@@ -44,41 +47,42 @@ const getMyGoal = async (req, res) => {
 };
 exports.getMyGoal = getMyGoal;
 const createGoal = async (req, res) => {
-    const { hoursPerWeek, targetDate } = req.body;
-    if (!hoursPerWeek || typeof hoursPerWeek !== "number") {
-        return res.status(400).json({ message: "hoursPerWeek is required" });
+    const parsed = studyGoal_schema_1.createStudyGoalSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json((0, validation_1.buildValidationError)(parsed.error));
     }
-    let targetCompletionAt = undefined;
-    if (targetDate) {
-        const parsedDate = new Date(targetDate);
-        if (Number.isNaN(parsedDate.getTime())) {
-            return res.status(400).json({ message: "targetDate is invalid" });
-        }
-        targetCompletionAt = parsedDate;
-    }
-    const goal = await studyGoalService.createStudyGoal(req.user.id, hoursPerWeek, targetCompletionAt);
+    const targetCompletionAt = parsed.data.targetDate
+        ? new Date(parsed.data.targetDate)
+        : undefined;
+    const goal = await studyGoalService.createStudyGoal(req.user.id, parsed.data.hoursPerWeek, targetCompletionAt);
+    (0, realtime_1.broadcast)({
+        type: "studyGoals.changed",
+        scope: { userId: req.user.id },
+    });
     res.status(201).json(goal);
 };
 exports.createGoal = createGoal;
 const updateGoal = async (req, res) => {
-    const { hoursPerWeek, targetDate } = req.body;
-    let targetCompletionAt = undefined;
-    if (targetDate !== undefined) {
-        if (targetDate === null || targetDate === "") {
-            targetCompletionAt = null;
-        }
-        else {
-            const parsedDate = new Date(targetDate);
-            if (Number.isNaN(parsedDate.getTime())) {
-                return res.status(400).json({ message: "targetDate is invalid" });
-            }
-            targetCompletionAt = parsedDate;
-        }
+    const parsed = studyGoal_schema_1.updateStudyGoalSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json((0, validation_1.buildValidationError)(parsed.error));
     }
-    const result = await studyGoalService.updateStudyGoal(req.params.id, req.user.id, { hoursPerWeek, targetCompletionAt });
+    const targetCompletionAt = parsed.data.targetDate === null
+        ? null
+        : parsed.data.targetDate
+            ? new Date(parsed.data.targetDate)
+            : undefined;
+    const result = await studyGoalService.updateStudyGoal(req.params.id, req.user.id, {
+        hoursPerWeek: parsed.data.hoursPerWeek,
+        targetCompletionAt,
+    });
     if (result.count === 0) {
         return res.status(404).json({ message: "Study goal not found" });
     }
+    (0, realtime_1.broadcast)({
+        type: "studyGoals.changed",
+        scope: { userId: req.user.id },
+    });
     res.json({ success: true });
 };
 exports.updateGoal = updateGoal;

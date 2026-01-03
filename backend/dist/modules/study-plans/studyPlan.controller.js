@@ -33,23 +33,19 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.completePlanItem = exports.myPlans = exports.generatePlan = void 0;
+exports.reschedulePlanItem = exports.completePlanItem = exports.myPlans = exports.generatePlan = void 0;
 const enrollment_guard_1 = require("../enrollments/enrollment.guard");
 const studyPlanService = __importStar(require("./studyPlan.service"));
+const realtime_1 = require("../../realtime/realtime");
+const studyPlan_schema_1 = require("../../validators/studyPlan.schema");
+const validation_1 = require("../../utils/validation");
 const generatePlan = async (req, res) => {
-    const { courseIds, hoursPerWeek, targetDate } = req.body;
-    if (!Array.isArray(courseIds) || courseIds.length === 0) {
-        return res.status(400).json({ message: "courseIds is required" });
+    const parsed = studyPlan_schema_1.generateStudyPlanSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json((0, validation_1.buildValidationError)(parsed.error));
     }
-    if (!hoursPerWeek || typeof hoursPerWeek !== "number") {
-        return res
-            .status(400)
-            .json({ message: "hoursPerWeek is required" });
-    }
+    const { courseIds, hoursPerWeek, targetDate } = parsed.data;
     const parsedTargetDate = new Date(targetDate);
-    if (!targetDate || Number.isNaN(parsedTargetDate.getTime())) {
-        return res.status(400).json({ message: "targetDate is invalid" });
-    }
     try {
         for (const courseId of courseIds) {
             await (0, enrollment_guard_1.ensureUserEnrolled)(req.user.id, courseId);
@@ -59,6 +55,10 @@ const generatePlan = async (req, res) => {
         return res.status(403).json({ message: error.message });
     }
     const plan = await studyPlanService.createStudyPlan(req.user.id, courseIds, hoursPerWeek, parsedTargetDate);
+    (0, realtime_1.broadcast)({
+        type: "studyPlans.changed",
+        scope: { userId: req.user.id },
+    });
     res.status(201).json(plan);
 };
 exports.generatePlan = generatePlan;
@@ -72,6 +72,26 @@ const completePlanItem = async (req, res) => {
     if (result.count === 0) {
         return res.status(404).json({ message: "Plan item not found" });
     }
+    (0, realtime_1.broadcast)({
+        type: "studyPlanItems.changed",
+        scope: { userId: req.user.id },
+    });
     res.json({ success: true });
 };
 exports.completePlanItem = completePlanItem;
+const reschedulePlanItem = async (req, res) => {
+    const parsed = studyPlan_schema_1.rescheduleStudyPlanItemSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json((0, validation_1.buildValidationError)(parsed.error));
+    }
+    const result = await studyPlanService.reschedulePlanItem(req.params.itemId, req.user.id, new Date(parsed.data.scheduledDate));
+    if (result.count === 0) {
+        return res.status(404).json({ message: "Plan item not found" });
+    }
+    (0, realtime_1.broadcast)({
+        type: "studyPlanItems.changed",
+        scope: { userId: req.user.id },
+    });
+    res.json({ success: true });
+};
+exports.reschedulePlanItem = reschedulePlanItem;

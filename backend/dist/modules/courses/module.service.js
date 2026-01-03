@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteModule = exports.updateModule = exports.getModulesByCourse = exports.createModule = void 0;
+exports.deleteModule = exports.updateModule = exports.getModuleByIdForOrg = exports.getModulesByCourse = exports.createModule = void 0;
 const prisma_1 = require("../../prisma");
 const createModule = async (courseId, data) => {
     return prisma_1.prisma.module.create({
@@ -19,6 +19,15 @@ const getModulesByCourse = async (courseId) => {
     });
 };
 exports.getModulesByCourse = getModulesByCourse;
+const getModuleByIdForOrg = async (moduleId, organizationId) => {
+    return prisma_1.prisma.module.findFirst({
+        where: {
+            id: moduleId,
+            course: { organizationId },
+        },
+    });
+};
+exports.getModuleByIdForOrg = getModuleByIdForOrg;
 const updateModule = async (moduleId, data) => {
     return prisma_1.prisma.module.update({
         where: { id: moduleId },

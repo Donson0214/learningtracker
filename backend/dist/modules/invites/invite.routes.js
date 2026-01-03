@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const requireAuth_1 = require("../../middlewares/requireAuth");
+const requireRole_1 = require("../../middlewares/requireRole");
+const requireActiveOrganization_1 = require("../../middlewares/requireActiveOrganization");
+const invite_controller_1 = require("./invite.controller");
+const router = (0, express_1.Router)();
+router.use(requireAuth_1.requireAuth);
+router.get("/me", invite_controller_1.listMyInvites);
+router.post("/accept", invite_controller_1.acceptInvite);
+router.post("/:id/accept", invite_controller_1.acceptInviteById);
+router.post("/:id/decline", invite_controller_1.declineInviteById);
+router.use(requireActiveOrganization_1.requireActiveOrganization);
+router.post("/", (0, requireRole_1.requireRole)(["ORG_ADMIN", "SYSTEM_ADMIN"]), invite_controller_1.createInvite);
+router.get("/", (0, requireRole_1.requireRole)(["ORG_ADMIN", "SYSTEM_ADMIN"]), invite_controller_1.listInvites);
+router.delete("/:id", (0, requireRole_1.requireRole)(["ORG_ADMIN", "SYSTEM_ADMIN"]), invite_controller_1.revokeInvite);
+exports.default = router;

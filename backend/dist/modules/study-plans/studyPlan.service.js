@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyStudyPlans = exports.markPlanItemComplete = exports.createStudyPlan = void 0;
+exports.getMyStudyPlans = exports.reschedulePlanItem = exports.markPlanItemComplete = exports.createStudyPlan = void 0;
 const prisma_1 = require("../../prisma");
 const studyPlan_generator_1 = require("./studyPlan.generator");
 const createStudyPlan = async (userId, courseIds, hoursPerWeek, endDate) => {
@@ -53,6 +53,18 @@ const markPlanItemComplete = async (itemId, userId) => {
     });
 };
 exports.markPlanItemComplete = markPlanItemComplete;
+const reschedulePlanItem = async (itemId, userId, scheduledDate) => {
+    return prisma_1.prisma.studyPlanItem.updateMany({
+        where: {
+            id: itemId,
+            studyPlan: { userId },
+        },
+        data: {
+            scheduledDate,
+        },
+    });
+};
+exports.reschedulePlanItem = reschedulePlanItem;
 const getMyStudyPlans = async (userId) => {
     return prisma_1.prisma.studyPlan.findMany({
         where: { userId },

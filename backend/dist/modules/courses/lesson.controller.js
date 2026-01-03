@@ -35,25 +35,84 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteLesson = exports.updateLesson = exports.createLesson = void 0;
 const lessonService = __importStar(require("./lesson.service"));
+const moduleService = __importStar(require("./module.service"));
+const realtime_1 = require("../../realtime/realtime");
+const course_schema_1 = require("../../validators/course.schema");
+const validation_1 = require("../../utils/validation");
 const createLesson = async (req, res) => {
-    const { title, estimatedMinutes } = req.body;
-    if (!title || estimatedMinutes === undefined) {
-        return res
-            .status(400)
-            .json({ message: "Title and estimatedMinutes required" });
+    const parsed = course_schema_1.createLessonSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json((0, validation_1.buildValidationError)(parsed.error));
     }
-    const lesson = await lessonService.createLesson(req.params.moduleId, { title, estimatedMinutes });
+    if (!req.user?.organizationId) {
+        return res.status(404).json({ message: "No organization assigned" });
+    }
+    const module = await moduleService.getModuleByIdForOrg(req.params.moduleId, req.user.organizationId);
+    if (!module) {
+        return res.status(404).json({ message: "Module not found" });
+    }
+    const lesson = await lessonService.createLesson(req.params.moduleId, {
+        title: parsed.data.title,
+        estimatedMinutes: parsed.data.estimatedMinutes,
+    });
+    if (req.user?.organizationId) {
+        (0, realtime_1.broadcast)({
+            type: "lessons.changed",
+            scope: { organizationId: req.user.organizationId },
+        });
+        (0, realtime_1.broadcast)({
+            type: "modules.changed",
+            scope: { organizationId: req.user.organizationId },
+        });
+    }
     res.status(201).json(lesson);
 };
 exports.createLesson = createLesson;
 const updateLesson = async (req, res) => {
-    const { title, estimatedMinutes } = req.body;
-    const lesson = await lessonService.updateLesson(req.params.lessonId, { title, estimatedMinutes });
+    if (!req.user?.organizationId) {
+        return res.status(404).json({ message: "No organization assigned" });
+    }
+    const existing = await lessonService.getLessonByIdForOrg(req.params.lessonId, req.user.organizationId);
+    if (!existing) {
+        return res.status(404).json({ message: "Lesson not found" });
+    }
+    const parsed = course_schema_1.updateLessonSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json((0, validation_1.buildValidationError)(parsed.error));
+    }
+    const lesson = await lessonService.updateLesson(req.params.lessonId, parsed.data);
+    if (req.user?.organizationId) {
+        (0, realtime_1.broadcast)({
+            type: "lessons.changed",
+            scope: { organizationId: req.user.organizationId },
+        });
+        (0, realtime_1.broadcast)({
+            type: "modules.changed",
+            scope: { organizationId: req.user.organizationId },
+        });
+    }
     res.json(lesson);
 };
 exports.updateLesson = updateLesson;
 const deleteLesson = async (req, res) => {
+    if (!req.user?.organizationId) {
+        return res.status(404).json({ message: "No organization assigned" });
+    }
+    const existing = await lessonService.getLessonByIdForOrg(req.params.lessonId, req.user.organizationId);
+    if (!existing) {
+        return res.status(404).json({ message: "Lesson not found" });
+    }
     await lessonService.deleteLesson(req.params.lessonId);
+    if (req.user?.organizationId) {
+        (0, realtime_1.broadcast)({
+            type: "lessons.changed",
+            scope: { organizationId: req.user.organizationId },
+        });
+        (0, realtime_1.broadcast)({
+            type: "modules.changed",
+            scope: { organizationId: req.user.organizationId },
+        });
+    }
     res.json({ success: true });
 };
 exports.deleteLesson = deleteLesson;

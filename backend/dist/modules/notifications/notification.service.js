@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendPushNotification = exports.saveDeviceToken = exports.createNotification = exports.markAsRead = exports.getMyNotifications = void 0;
+exports.updateDailyReminderPreference = exports.sendPushNotification = exports.saveDeviceToken = exports.notifyOrganizationUsers = exports.createNotification = exports.markAsRead = exports.getMyNotifications = void 0;
 const prisma_1 = require("../../prisma");
 const firebase_1 = require("../../config/firebase");
 // list
@@ -26,6 +26,31 @@ const createNotification = async (userId, title, body) => {
     });
 };
 exports.createNotification = createNotification;
+const notifyOrganizationUsers = async (organizationId, title, body, options = {}) => {
+    const filters = { organizationId };
+    if (options.excludeRoles?.length) {
+        filters.role = { notIn: options.excludeRoles };
+    }
+    if (options.excludeUserIds?.length) {
+        filters.id = { notIn: options.excludeUserIds };
+    }
+    const users = await prisma_1.prisma.user.findMany({
+        where: filters,
+        select: { id: true },
+    });
+    if (!users.length) {
+        return [];
+    }
+    await prisma_1.prisma.notification.createMany({
+        data: users.map((user) => ({
+            userId: user.id,
+            title,
+            body,
+        })),
+    });
+    return users.map((user) => user.id);
+};
+exports.notifyOrganizationUsers = notifyOrganizationUsers;
 // save FCM device token
 const saveDeviceToken = async (userId, token) => {
     return prisma_1.prisma.deviceToken.upsert({
@@ -44,3 +69,10 @@ const sendPushNotification = async (token, title, body) => {
     });
 };
 exports.sendPushNotification = sendPushNotification;
+const updateDailyReminderPreference = async (userId, enabled) => {
+    return prisma_1.prisma.user.update({
+        where: { id: userId },
+        data: { dailyReminderEnabled: enabled },
+    });
+};
+exports.updateDailyReminderPreference = updateDailyReminderPreference;

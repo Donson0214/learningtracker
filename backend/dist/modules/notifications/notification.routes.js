@@ -12,4 +12,7 @@ router.get("/me", notification_controller_1.myNotifications);
 router.post("/:id/read", notification_controller_1.markRead);
 // save device token (separate controller to avoid breaking your file)
 router.post("/device-token", notification_token_controller_1.saveDeviceTokenHandler);
+router.post("/token", notification_token_controller_1.saveDeviceTokenHandler);
+// preferences
+router.patch("/preferences", notification_controller_1.updateDailyReminder);
 exports.default = router;

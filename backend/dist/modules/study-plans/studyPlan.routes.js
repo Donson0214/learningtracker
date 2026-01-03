@@ -2,10 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const requireAuth_1 = require("../../middlewares/requireAuth");
+const requireActiveOrganization_1 = require("../../middlewares/requireActiveOrganization");
 const studyPlan_controller_1 = require("./studyPlan.controller");
 const router = (0, express_1.Router)();
 router.use(requireAuth_1.requireAuth);
+router.use(requireActiveOrganization_1.requireActiveOrganization);
 router.post("/generate", studyPlan_controller_1.generatePlan);
 router.get("/me", studyPlan_controller_1.myPlans);
 router.patch("/items/:itemId/complete", studyPlan_controller_1.completePlanItem);
+router.patch("/items/:itemId/reschedule", studyPlan_controller_1.reschedulePlanItem);
 exports.default = router;

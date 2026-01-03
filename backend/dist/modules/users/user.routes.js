@@ -6,4 +6,5 @@ const user_controller_1 = require("./user.controller");
 const router = (0, express_1.Router)();
 router.use(requireAuth_1.requireAuth);
 router.get("/me", user_controller_1.getMe);
+router.patch("/me", user_controller_1.updateMe);
 exports.default = router;

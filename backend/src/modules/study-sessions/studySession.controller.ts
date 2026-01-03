@@ -129,11 +129,10 @@ export const updateSession = async (
     return res.status(400).json(buildValidationError(parsed.error));
   }
 
+  const { studiedAt, ...rest } = parsed.data;
   const updates = {
-    ...parsed.data,
-    ...(parsed.data.studiedAt
-      ? { studiedAt: new Date(parsed.data.studiedAt) }
-      : {}),
+    ...rest,
+    ...(studiedAt ? { studiedAt: new Date(studiedAt) } : {}),
   };
 
   await studyService.updateStudySession(

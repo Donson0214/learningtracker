@@ -33,8 +33,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMe = void 0;
+exports.updateMe = exports.getMe = void 0;
 const userService = __importStar(require("./user.service"));
+const realtime_1 = require("../../realtime/realtime");
 const getMe = async (req, res) => {
     const user = await userService.getUserById(req.user.id);
     if (!user) {
@@ -43,3 +44,24 @@ const getMe = async (req, res) => {
     res.json(user);
 };
 exports.getMe = getMe;
+const updateMe = async (req, res) => {
+    const { name } = req.body;
+    if (name !== undefined && typeof name !== "string") {
+        return res.status(400).json({ message: "name must be string" });
+    }
+    const updates = {};
+    if (name !== undefined) {
+        updates.name = name.trim() || null;
+    }
+    if (!Object.keys(updates).length) {
+        const user = await userService.getUserById(req.user.id);
+        return res.json(user);
+    }
+    const updated = await userService.updateUserById(req.user.id, updates);
+    (0, realtime_1.broadcast)({
+        type: "users.changed",
+        scope: { userId: req.user.id },
+    });
+    res.json(updated);
+};
+exports.updateMe = updateMe;

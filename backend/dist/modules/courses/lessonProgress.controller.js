@@ -33,38 +33,47 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateDailyReminder = exports.markRead = exports.myNotifications = void 0;
-const notificationService = __importStar(require("./notification.service"));
+exports.clearLessonCompletion = exports.completeLesson = void 0;
+const enrollment_guard_1 = require("../enrollments/enrollment.guard");
 const realtime_1 = require("../../realtime/realtime");
-const myNotifications = async (req, res) => {
-    const notifications = await notificationService.getMyNotifications(req.user.id);
-    res.json(notifications);
-};
-exports.myNotifications = myNotifications;
-const markRead = async (req, res) => {
-    const result = await notificationService.markAsRead(req.params.id, req.user.id);
-    if (result.count === 0) {
-        return res.status(404).json({ message: "Notification not found" });
+const lessonProgressService = __importStar(require("./lessonProgress.service"));
+const completeLesson = async (req, res) => {
+    const lessonId = req.params.lessonId;
+    const lesson = await lessonProgressService.getLessonCourseId(lessonId);
+    if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
     }
+    try {
+        await (0, enrollment_guard_1.ensureUserEnrolled)(req.user.id, lesson.courseId);
+    }
+    catch (error) {
+        return res.status(403).json({ message: error.message });
+    }
+    const progress = await lessonProgressService.completeLesson(req.user.id, lessonId);
     (0, realtime_1.broadcast)({
-        type: "notifications.changed",
+        type: "lessonProgress.changed",
+        scope: { userId: req.user.id },
+    });
+    res.json({ success: true, completedAt: progress.completedAt });
+};
+exports.completeLesson = completeLesson;
+const clearLessonCompletion = async (req, res) => {
+    const lessonId = req.params.lessonId;
+    const lesson = await lessonProgressService.getLessonCourseId(lessonId);
+    if (!lesson) {
+        return res.status(404).json({ message: "Lesson not found" });
+    }
+    try {
+        await (0, enrollment_guard_1.ensureUserEnrolled)(req.user.id, lesson.courseId);
+    }
+    catch (error) {
+        return res.status(403).json({ message: error.message });
+    }
+    await lessonProgressService.clearLessonCompletion(req.user.id, lessonId);
+    (0, realtime_1.broadcast)({
+        type: "lessonProgress.changed",
         scope: { userId: req.user.id },
     });
     res.json({ success: true });
 };
-exports.markRead = markRead;
-const updateDailyReminder = async (req, res) => {
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-        return res
-            .status(400)
-            .json({ message: "enabled must be boolean" });
-    }
-    await notificationService.updateDailyReminderPreference(req.user.id, enabled);
-    (0, realtime_1.broadcast)({
-        type: "notifications.changed",
-        scope: { userId: req.user.id },
-    });
-    res.json({ success: true });
-};
-exports.updateDailyReminder = updateDailyReminder;
+exports.clearLessonCompletion = clearLessonCompletion;

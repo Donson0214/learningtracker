@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteStudySession = exports.updateStudySession = exports.getSessionsForUser = exports.createStudySession = void 0;
+exports.deleteStudySession = exports.updateStudySession = exports.getSessionsForUser = exports.getSessionById = exports.createStudySession = void 0;
 const prisma_1 = require("../../prisma");
 const createStudySession = async (userId, data) => {
     return prisma_1.prisma.studySession.create({
@@ -8,17 +8,35 @@ const createStudySession = async (userId, data) => {
             userId,
             ...data,
         },
+        include: {
+            course: true,
+        },
     });
 };
 exports.createStudySession = createStudySession;
-const getSessionsForUser = async (userId) => {
+const getSessionById = async (sessionId, userId) => {
+    return prisma_1.prisma.studySession.findFirst({
+        where: { id: sessionId, userId },
+        include: { course: true },
+    });
+};
+exports.getSessionById = getSessionById;
+const getSessionsForUser = async (userId, filters = {}) => {
+    const where = { userId };
+    if (filters.courseId) {
+        where.courseId = filters.courseId;
+    }
+    if (filters.moduleId) {
+        where.moduleId = filters.moduleId;
+    }
     return prisma_1.prisma.studySession.findMany({
-        where: { userId },
+        where,
         include: {
             course: true,
             module: true,
         },
         orderBy: { studiedAt: "desc" },
+        ...(filters.limit ? { take: filters.limit } : {}),
     });
 };
 exports.getSessionsForUser = getSessionsForUser;

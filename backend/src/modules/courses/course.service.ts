@@ -94,6 +94,50 @@ export const getCoursesForLearnerPaged = async (
   }
 ) => {
   const includeModules = Boolean(options.includeModules);
+
+  if (includeModules) {
+    const [enrollments, total] = await Promise.all([
+      prisma.enrollment.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        skip: options.skip,
+        take: options.take,
+        include: {
+          course: {
+            include: {
+              modules: {
+                include: {
+                  lessons: {
+                    include: {
+                      lessonProgresses: {
+                        where: { userId },
+                        select: { completedAt: true },
+                      },
+                    },
+                  },
+                },
+              },
+              _count: {
+                select: { modules: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.enrollment.count({ where: { userId } }),
+    ]);
+
+    const items = enrollments.map((enrollment) => {
+      const { _count, ...course } = enrollment.course;
+      return {
+        ...mapCourseWithProgress(course),
+        modulesCount: _count.modules,
+      };
+    });
+
+    return { items, total };
+  }
+
   const [enrollments, total] = await Promise.all([
     prisma.enrollment.findMany({
       where: { userId },
@@ -103,22 +147,6 @@ export const getCoursesForLearnerPaged = async (
       include: {
         course: {
           include: {
-            ...(includeModules
-              ? {
-                  modules: {
-                    include: {
-                      lessons: {
-                        include: {
-                          lessonProgresses: {
-                            where: { userId },
-                            select: { completedAt: true },
-                          },
-                        },
-                      },
-                    },
-                  },
-                }
-              : {}),
             _count: {
               select: { modules: true },
             },
@@ -131,10 +159,8 @@ export const getCoursesForLearnerPaged = async (
 
   const items = enrollments.map((enrollment) => {
     const { _count, ...course } = enrollment.course;
-    const mappedCourse =
-      includeModules ? mapCourseWithProgress(course) : course;
     return {
-      ...mappedCourse,
+      ...course,
       modulesCount: _count.modules,
     };
   });

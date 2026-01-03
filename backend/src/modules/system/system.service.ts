@@ -148,6 +148,52 @@ export const listOrganizationCoursesPaged = async (
   organizationId: string,
   options: { skip: number; take: number; includeModules: boolean }
 ) => {
+  if (options.includeModules) {
+    const [items, total] = await Promise.all([
+      prisma.course.findMany({
+        where: { organizationId },
+        orderBy: { createdAt: "desc" },
+        skip: options.skip,
+        take: options.take,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          estimatedHours: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: { select: { modules: true } },
+          modules: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              title: true,
+              order: true,
+              lessons: {
+                select: { id: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.course.count({ where: { organizationId } }),
+    ]);
+
+    return {
+      items: items.map((course) => ({
+        ...course,
+        modulesCount: course._count.modules,
+        modules: course.modules.map((module) => ({
+          id: module.id,
+          title: module.title,
+          order: module.order,
+          lessonsCount: module.lessons.length,
+        })),
+      })),
+      total,
+    };
+  }
+
   const [items, total] = await Promise.all([
     prisma.course.findMany({
       where: { organizationId },
@@ -162,19 +208,6 @@ export const listOrganizationCoursesPaged = async (
         createdAt: true,
         updatedAt: true,
         _count: { select: { modules: true } },
-        modules: options.includeModules
-          ? {
-              orderBy: { order: "asc" },
-              select: {
-                id: true,
-                title: true,
-                order: true,
-                lessons: {
-                  select: { id: true },
-                },
-              },
-            }
-          : undefined,
       },
     }),
     prisma.course.count({ where: { organizationId } }),
@@ -184,12 +217,6 @@ export const listOrganizationCoursesPaged = async (
     items: items.map((course) => ({
       ...course,
       modulesCount: course._count.modules,
-      modules: course.modules?.map((module) => ({
-        id: module.id,
-        title: module.title,
-        order: module.order,
-        lessonsCount: module.lessons.length,
-      })),
     })),
     total,
   };
@@ -233,6 +260,56 @@ export const listCoursesPaged = async (options: {
   take: number;
   includeModules: boolean;
 }) => {
+  if (options.includeModules) {
+    const [items, total] = await Promise.all([
+      prisma.course.findMany({
+        orderBy: { createdAt: "desc" },
+        skip: options.skip,
+        take: options.take,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          estimatedHours: true,
+          createdAt: true,
+          updatedAt: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              isActive: true,
+            },
+          },
+          _count: { select: { modules: true } },
+          modules: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              title: true,
+              order: true,
+              lessons: { select: { id: true } },
+            },
+          },
+        },
+      }),
+      prisma.course.count(),
+    ]);
+
+    return {
+      items: items.map((course) => ({
+        ...course,
+        modulesCount: course._count.modules,
+        modules: course.modules.map((module) => ({
+          id: module.id,
+          title: module.title,
+          order: module.order,
+          lessonsCount: module.lessons.length,
+        })),
+      })),
+      total,
+    };
+  }
+
   const [items, total] = await Promise.all([
     prisma.course.findMany({
       orderBy: { createdAt: "desc" },
@@ -253,17 +330,6 @@ export const listCoursesPaged = async (options: {
           },
         },
         _count: { select: { modules: true } },
-        modules: options.includeModules
-          ? {
-              orderBy: { order: "asc" },
-              select: {
-                id: true,
-                title: true,
-                order: true,
-                lessons: { select: { id: true } },
-              },
-            }
-          : undefined,
       },
     }),
     prisma.course.count(),
@@ -273,12 +339,6 @@ export const listCoursesPaged = async (options: {
     items: items.map((course) => ({
       ...course,
       modulesCount: course._count.modules,
-      modules: course.modules?.map((module) => ({
-        id: module.id,
-        title: module.title,
-        order: module.order,
-        lessonsCount: module.lessons.length,
-      })),
     })),
     total,
   };

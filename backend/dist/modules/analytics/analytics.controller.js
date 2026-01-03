@@ -33,10 +33,20 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.learnerDashboard = void 0;
+exports.orgDashboard = exports.learnerDashboard = void 0;
 const analyticsService = __importStar(require("./analytics.service"));
 const learnerDashboard = async (req, res) => {
     const dashboard = await analyticsService.getLearnerDashboard(req.user.id);
     res.json(dashboard);
 };
 exports.learnerDashboard = learnerDashboard;
+const orgDashboard = async (req, res) => {
+    if (!req.user?.organizationId) {
+        return res
+            .status(404)
+            .json({ message: "Organization not found" });
+    }
+    const dashboard = await analyticsService.getOrgDashboard(req.user.organizationId);
+    res.json(dashboard);
+};
+exports.orgDashboard = orgDashboard;

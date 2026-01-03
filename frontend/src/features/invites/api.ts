@@ -10,10 +10,13 @@ export const acceptInvite = async (token: string) => {
 };
 
 export const fetchMyInvites = async () => {
-  const { data } = await apiClient.get<OrganizationInvite[]>(
-    "/invites/me"
-  );
-  return data;
+  const { data } = await apiClient.get<
+    OrganizationInvite[] | { items?: OrganizationInvite[] }
+  >("/invites/me");
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return Array.isArray(data?.items) ? data.items : [];
 };
 
 export const acceptInviteById = async (inviteId: string) => {

@@ -2,8 +2,13 @@ import { apiClient } from "@/shared/api/axios";
 import type { Notification } from "@/shared/types";
 
 export const fetchNotifications = async () => {
-  const { data } = await apiClient.get<Notification[]>("/notifications/me");
-  return data;
+  const { data } = await apiClient.get<
+    Notification[] | { items?: Notification[] }
+  >("/notifications/me");
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return Array.isArray(data?.items) ? data.items : [];
 };
 
 export const markNotificationRead = async (id: string) => {

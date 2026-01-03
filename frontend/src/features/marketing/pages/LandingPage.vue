@@ -114,14 +114,20 @@ const screenshots = [
   {
     title: "Progress overview",
     description: "Follow streaks, modules, and completion in one place.",
+    image:
+      "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80",
   },
   {
     title: "Course builder",
     description: "Design modules and lessons with clear sequencing.",
+    image:
+      "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=900&q=80",
   },
   {
     title: "Team insights",
     description: "Spot engagement dips and celebrate wins quickly.",
+    image:
+      "https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=900&q=80",
   },
 ];
 
@@ -612,7 +618,15 @@ onBeforeUnmount(() => {
               :style="{ '--reveal-delay': `${index * 120}ms` }"
               data-reveal
             >
-              <div class="h-36 rounded-2xl bg-gradient-to-br from-slate-200 via-white to-slate-100 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800"></div>
+              <div class="relative h-36 overflow-hidden rounded-2xl">
+                <img
+                  :src="shot.image"
+                  :alt="shot.title"
+                  class="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/45 via-transparent to-transparent"></div>
+              </div>
               <h3 class="mt-4 text-lg font-semibold text-slate-900 dark:text-white">{{ shot.title }}</h3>
               <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ shot.description }}</p>
             </div>

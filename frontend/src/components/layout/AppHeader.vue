@@ -247,6 +247,7 @@ import {
 } from "@/features/invites/api";
 import { useTheme } from "@/shared/theme/useTheme";
 import { useCoursesStore } from "@/features/courses/store";
+import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import type { Notification, OrganizationInvite } from "@/shared/types";
 
 const route = useRoute();
@@ -334,11 +335,17 @@ const loadBadgeCount = async () => {
   await Promise.all([loadNotifications(), loadInvites()]);
 };
 
-const visibleNotifications = computed(() =>
-  notifications.value.filter(
-    (item) => item.title !== "Organization Invitation"
-  )
+useRealtimeRefresh(
+  ["notifications.changed", "invites.changed"],
+  () => loadBadgeCount()
 );
+
+const visibleNotifications = computed(() => {
+  const hasPendingInvites = invites.value.length > 0;
+  return notifications.value.filter(
+    (item) => item.title !== "Organization Invitation" || !hasPendingInvites
+  );
+});
 
 const unreadCount = computed(
   () => visibleNotifications.value.filter((item) => !item.isRead).length

@@ -19,6 +19,12 @@ export const createStudyPlan = async (
     },
   });
 
+  if (!lessons.length) {
+    throw new Error(
+      "No lessons found for the selected courses. Add lessons before generating a plan."
+    );
+  }
+
   const planItems = generateStudyPlan({
     lessons: lessons.map((l) => ({
       id: l.id,
@@ -30,6 +36,12 @@ export const createStudyPlan = async (
     endDate,
     minutesPerWeek: hoursPerWeek * 60,
   });
+
+  if (!planItems.length) {
+    throw new Error(
+      "Unable to generate a study plan for the selected date range. Try a later target date or higher weekly hours."
+    );
+  }
 
   return prisma.studyPlan.create({
     data: {

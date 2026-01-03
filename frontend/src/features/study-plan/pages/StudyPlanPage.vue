@@ -64,8 +64,10 @@
           <StateMessage
             v-else-if="planItems.length === 0"
             variant="empty"
-            title="No study plan yet"
-            message="Generate a plan to get started."
+            :title="hasPlan ? 'No tasks scheduled' : 'No study plan yet'"
+            :message="hasPlan
+              ? 'Add lessons to your courses or choose a later target date.'
+              : 'Generate a plan to get started.'"
           />
 
           <template v-else>
@@ -100,7 +102,13 @@
 
         <div>
           <p class="text-sm text-slate-300 mb-2">Courses</p>
-          <div class="space-y-2">
+          <StateMessage
+            v-if="availableCourses.length === 0"
+            variant="empty"
+            title="No enrolled courses"
+            message="Enroll in a course to generate a study plan."
+          />
+          <div v-else class="space-y-2">
             <label
               v-for="course in availableCourses"
               :key="course.id"
@@ -125,7 +133,10 @@
           >
             Cancel
           </button>
-          <Button type="submit" :disabled="isGenerating">
+          <Button
+            type="submit"
+            :disabled="isGenerating || availableCourses.length === 0"
+          >
             {{ isGenerating ? "Generating..." : "Generate" }}
           </Button>
         </div>
@@ -217,6 +228,7 @@ useRealtimeRefresh(
 );
 
 const activePlan = computed(() => plans.value[0]);
+const hasPlan = computed(() => Boolean(activePlan.value));
 
 const courseLookup = computed(() => {
   const map = new Map<string, string>();
@@ -314,7 +326,19 @@ const submitGenerator = async () => {
     plans.value = [plan, ...plans.value];
     showGenerator.value = false;
   } catch (error) {
-    errorMessage.value = "Unable to generate study plan.";
+    if (
+      error &&
+      typeof error === "object" &&
+      "response" in error &&
+      (error as { response?: { data?: { message?: string } } }).response
+        ?.data?.message
+    ) {
+      errorMessage.value = (error as {
+        response?: { data?: { message?: string } };
+      }).response!.data!.message!;
+    } else {
+      errorMessage.value = "Unable to generate study plan.";
+    }
   } finally {
     isGenerating.value = false;
   }

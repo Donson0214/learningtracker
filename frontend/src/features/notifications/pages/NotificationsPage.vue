@@ -284,11 +284,12 @@ useRealtimeRefresh(
   }
 );
 
-const visibleNotifications = computed(() =>
-  notifications.value.filter(
-    (item) => item.title !== "Organization Invitation"
-  )
-);
+const visibleNotifications = computed(() => {
+  const hasPendingInvites = invites.value.length > 0;
+  return notifications.value.filter(
+    (item) => item.title !== "Organization Invitation" || !hasPendingInvites
+  );
+});
 
 const unreadCount = computed(
   () => visibleNotifications.value.filter((item) => !item.isRead).length

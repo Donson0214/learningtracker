@@ -16,6 +16,7 @@ import {
   fetchNotifications,
   markNotificationRead,
 } from "@/features/notifications/api";
+import { useRealtimeRefresh } from "@/shared/realtime/useRealtimeRefresh";
 import type { Notification } from "@/shared/types";
 
 const route = useRoute();
@@ -112,11 +113,12 @@ const loadNotifications = async () => {
   }
 };
 
-const visibleNotifications = computed(() =>
-  notifications.value.filter(
-    (item) => item.title !== "Organization Invitation"
-  )
+useRealtimeRefresh(
+  ["notifications.changed"],
+  () => loadNotifications()
 );
+
+const visibleNotifications = computed(() => notifications.value);
 
 const unreadCount = computed(
   () => visibleNotifications.value.filter((item) => !item.isRead).length

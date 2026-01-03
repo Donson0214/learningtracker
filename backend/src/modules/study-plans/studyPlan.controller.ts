@@ -19,6 +19,17 @@ export const generatePlan = async (
   }
   const { courseIds, hoursPerWeek, targetDate } = parsed.data;
   const parsedTargetDate = new Date(targetDate);
+  parsedTargetDate.setHours(23, 59, 59, 999);
+
+  if (Number.isNaN(parsedTargetDate.getTime())) {
+    return res.status(400).json({ message: "Invalid target date" });
+  }
+
+  if (parsedTargetDate < new Date()) {
+    return res
+      .status(400)
+      .json({ message: "Target date must be today or later" });
+  }
 
   try {
     for (const courseId of courseIds) {
@@ -28,12 +39,21 @@ export const generatePlan = async (
     return res.status(403).json({ message: error.message });
   }
 
-  const plan = await studyPlanService.createStudyPlan(
-    req.user!.id,
-    courseIds,
-    hoursPerWeek,
-    parsedTargetDate
-  );
+  let plan;
+  try {
+    plan = await studyPlanService.createStudyPlan(
+      req.user!.id,
+      courseIds,
+      hoursPerWeek,
+      parsedTargetDate
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to generate study plan";
+    return res.status(400).json({ message });
+  }
 
   broadcast({
     type: "studyPlans.changed",

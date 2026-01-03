@@ -575,7 +575,11 @@ const catalogRangeLabel = computed(() => {
       <form class="space-y-4" @submit.prevent="sendInvite">
         <div>
           <label class="text-sm text-slate-300">Email</label>
-          <Input v-model="inviteForm.email" placeholder="learner@example.com" />
+          <Input
+            v-model="inviteForm.email"
+            type="email"
+            placeholder="learner@example.com"
+          />
         </div>
         <div>
           <label class="text-sm text-slate-300">Role</label>

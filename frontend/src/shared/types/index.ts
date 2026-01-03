@@ -115,6 +115,7 @@ export type OrganizationInvite = {
   } | null;
   inviteLink?: string;
   emailSent?: boolean;
+  emailError?: string | null;
 };
 
 export type Lesson = {

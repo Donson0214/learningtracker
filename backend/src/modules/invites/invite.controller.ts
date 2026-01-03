@@ -5,6 +5,10 @@ import { broadcast } from "../../realtime/realtime";
 import { sendInviteEmail } from "./invite.mailer";
 import * as inviteService from "./invite.service";
 import { prisma } from "../../prisma";
+import {
+  createNotification,
+  sendPushNotification,
+} from "../notifications/notification.service";
 
 const allowedRoles = new Set(["LEARNER", "ORG_ADMIN"]);
 
@@ -18,6 +22,55 @@ const getInviteExpiryDays = () => {
     return 7;
   }
   return Math.floor(parsed);
+};
+
+const getInviteNotificationContent = (
+  invitedBy: string,
+  organizationName: string
+) => {
+  const title = "Organization Invitation";
+  const body = `${invitedBy} invited you to join ${organizationName}.`;
+  return { title, body };
+};
+
+const getInviteEmailErrorMessage = (error: unknown) => {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("smtp_user") || message.includes("smtp_pass")) {
+      return "Email service is not configured. Set SMTP_USER and SMTP_PASS.";
+    }
+    if (message.includes("auth")) {
+      return "Email authentication failed. Check SMTP credentials.";
+    }
+  }
+  return "Email delivery failed.";
+};
+
+const notifyInvitee = async (
+  userId: string,
+  invitedBy: string,
+  organizationName: string
+) => {
+  const { title, body } = getInviteNotificationContent(
+    invitedBy,
+    organizationName
+  );
+  await createNotification(userId, title, body);
+  const tokens = await prisma.deviceToken.findMany({
+    where: { userId },
+    select: { token: true },
+  });
+  for (const entry of tokens) {
+    try {
+      await sendPushNotification(entry.token, title, body);
+    } catch (error) {
+      console.warn("Failed to send invite push notification:", error);
+    }
+  }
+  broadcast({
+    type: "notifications.changed",
+    scope: { userId },
+  });
 };
 
 export const createInvite = async (
@@ -40,7 +93,7 @@ export const createInvite = async (
   const normalizedEmail = email.trim().toLowerCase();
   const existingMember = await prisma.user.findFirst({
     where: {
-      email: normalizedEmail,
+      email: { equals: normalizedEmail, mode: "insensitive" },
       organizationId: req.user.organizationId,
     },
     select: { id: true },
@@ -51,8 +104,8 @@ export const createInvite = async (
       .json({ message: "User already belongs to this organization" });
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
+  const existingUser = await prisma.user.findFirst({
+    where: { email: { equals: normalizedEmail, mode: "insensitive" } },
     select: { id: true },
   });
 
@@ -86,22 +139,30 @@ export const createInvite = async (
     where: { id: req.user.organizationId },
     select: { name: true },
   });
+  const organizationName = organization?.name ?? "your organization";
 
   let emailSent = true;
+  let emailError: string | null = null;
   try {
     await sendInviteEmail({
       to: invite.email,
-      organizationName: organization?.name ?? "your organization",
+      organizationName,
       invitedBy,
       inviteLink,
       expiresInDays,
     });
   } catch (error) {
     emailSent = false;
+    emailError = getInviteEmailErrorMessage(error);
     console.warn("Failed to send invite email:", error);
   }
 
   if (existingUser) {
+    try {
+      await notifyInvitee(existingUser.id, invitedBy, organizationName);
+    } catch (error) {
+      console.warn("Failed to notify invitee:", error);
+    }
     broadcast({
       type: "invites.changed",
       scope: { userId: existingUser.id },
@@ -116,6 +177,7 @@ export const createInvite = async (
   res.status(201).json({
     ...invite,
     emailSent,
+    emailError,
     inviteLink,
   });
 };

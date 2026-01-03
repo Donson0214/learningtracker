@@ -244,14 +244,31 @@ export const useAdminMembersStore = defineStore(
       clearError();
       try {
         const response = await createInvite(payload);
-        if (response.emailSent === false && response.inviteLink) {
-          errorMessage.value =
-            "Invite created, but email was not sent. Share this link: " +
-            response.inviteLink;
+        if (response.emailSent === false) {
+          const baseMessage =
+            response.emailError ||
+            "Invite created, but email was not sent.";
+          if (response.inviteLink) {
+            errorMessage.value = `${baseMessage} Share this link: ${response.inviteLink}`;
+          } else {
+            errorMessage.value = baseMessage;
+          }
         }
         invites.value = await fetchInvites();
       } catch (error) {
-        errorMessage.value = "Unable to send invite.";
+        if (
+          error &&
+          typeof error === "object" &&
+          "response" in error &&
+          (error as { response?: { data?: { message?: string } } }).response
+            ?.data?.message
+        ) {
+          errorMessage.value = (error as {
+            response?: { data?: { message?: string } };
+          }).response!.data!.message!;
+        } else {
+          errorMessage.value = "Unable to send invite.";
+        }
         throw error;
       }
     };

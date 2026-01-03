@@ -43,18 +43,27 @@ export const createStudyPlan = async (
     );
   }
 
-  return prisma.studyPlan.create({
-    data: {
-      userId,
-      startDate,
-      endDate,
-      items: {
-        create: planItems,
+  return prisma.$transaction(async (tx) => {
+    await tx.studyPlanItem.deleteMany({
+      where: { studyPlan: { userId } },
+    });
+    await tx.studyPlan.deleteMany({
+      where: { userId },
+    });
+
+    return tx.studyPlan.create({
+      data: {
+        userId,
+        startDate,
+        endDate,
+        items: {
+          create: planItems,
+        },
       },
-    },
-    include: {
-      items: true,
-    },
+      include: {
+        items: true,
+      },
+    });
   });
 };
 

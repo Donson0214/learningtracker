@@ -183,6 +183,32 @@ const targetDate = ref<string>("");
 const selectedCourseIds = ref<string[]>([]);
 const isGenerating = ref(false);
 
+const ensureFutureTargetDate = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const parsed = targetDate.value ? new Date(targetDate.value) : null;
+  if (!parsed || Number.isNaN(parsed.getTime()) || parsed < today) {
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 30);
+    targetDate.value = fallback.toISOString().slice(0, 10);
+  }
+};
+
+const syncSelectedCourses = (enrollmentData: Enrollment[]) => {
+  const enrolledIds = enrollmentData.map((enrollment) => enrollment.courseId);
+  if (selectedCourseIds.value.length === 0) {
+    selectedCourseIds.value = enrolledIds;
+    return;
+  }
+  const enrolledSet = new Set(enrolledIds);
+  const filtered = selectedCourseIds.value.filter((id) =>
+    enrolledSet.has(id)
+  );
+  if (filtered.length !== selectedCourseIds.value.length) {
+    selectedCourseIds.value = filtered;
+  }
+};
+
 const loadData = async () => {
   if (!hasOrganization.value) {
     errorMessage.value = "";
@@ -207,13 +233,10 @@ const loadData = async () => {
       if (goal.targetCompletionAt) {
         targetDate.value = goal.targetCompletionAt.slice(0, 10);
       }
-    } else if (!targetDate.value) {
-      const fallback = new Date();
-      fallback.setDate(fallback.getDate() + 30);
-      targetDate.value = fallback.toISOString().slice(0, 10);
     }
 
-    selectedCourseIds.value = enrollmentData.map((e) => e.courseId);
+    ensureFutureTargetDate();
+    syncSelectedCourses(enrollmentData);
   } catch (error) {
     errorMessage.value = "Unable to load study plan.";
   } finally {
@@ -298,6 +321,8 @@ const availableCourses = computed(() =>
 );
 
 const openGenerator = () => {
+  syncSelectedCourses(enrollments.value);
+  ensureFutureTargetDate();
   showGenerator.value = true;
 };
 
@@ -323,7 +348,7 @@ const submitGenerator = async () => {
       hoursPerWeek: Number(hoursPerWeek.value),
       targetDate: targetDate.value,
     });
-    plans.value = [plan, ...plans.value];
+    plans.value = [plan];
     showGenerator.value = false;
   } catch (error) {
     if (

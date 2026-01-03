@@ -59,6 +59,10 @@ export const generatePlan = async (
     type: "studyPlans.changed",
     scope: { userId: req.user!.id },
   });
+  broadcast({
+    type: "studyPlanItems.changed",
+    scope: { userId: req.user!.id },
+  });
 
   res.status(201).json(plan);
 };
